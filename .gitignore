@@ -1,0 +1,5 @@
+bin/
+*.swp
+*.swo
+*.tgz
+*.tar.gz

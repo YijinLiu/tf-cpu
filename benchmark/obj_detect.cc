@@ -8,12 +8,14 @@
 #include <vector>
 
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <tensorflow/core/public/session.h>
 
 #include "test_video.hpp"
+#include "video_encoder.hpp"
 
 DEFINE_string(model_file, "", "");
 DEFINE_string(labels_file, "", "");
@@ -23,6 +25,7 @@ DEFINE_string(image_file, "", "");
 DEFINE_int32(width, 320, "");
 DEFINE_int32(height, 0, "");
 DEFINE_string(output, "", "");
+DEFINE_bool(output_video, true, "");
 
 DEFINE_int32(ffmpeg_log_level, 8, "");
 
@@ -153,16 +156,37 @@ class ObjDetector {
 
 
     bool RunVideo(const std::string& video_file, int width, int height,
-                  const std::string& output_name) {
+                  const std::string& output_name, bool output_video) {
         // Open input video.
-        TestVideo test_video(av_pix_fmt(), width, height);
+        TestVideo test_video(av_pix_fmt(), 0, 0);
         if (!test_video.Init(video_file, nullptr, true)) {
-            LOG(ERROR) << "Failed to open video file " << video_file;
             return false;
         }
-        width = test_video.width();
-        height = test_video.height();
+        // Open output video if needed.
+        AVFrame* encode_frame = nullptr;
+        std::unique_ptr<VideoEncoder> video_encoder;
+        if (output_video) {
+            video_encoder.reset(new VideoEncoder);
+            enum AVPixelFormat pix_fmt = input_channels_ == 3 ? AV_PIX_FMT_BGR24 : AV_PIX_FMT_GRAY8;
+            if (!video_encoder->Init(pix_fmt, test_video.width(), test_video.height(),
+                                     test_video.time_base(), output_name)) {
+                return false;
+            }
+            encode_frame = av_frame_alloc();
+            encode_frame->width = test_video.width();
+            encode_frame->height = test_video.height();
+            encode_frame->format = pix_fmt;
+            av_frame_get_buffer(encode_frame, 0);
+        }
 
+        if (width == 0 && height == 0) {
+            width = test_video.width();
+            height = test_video.height();
+        } else if (width == 0) {
+            width = test_video.width() * height / test_video.height();
+        } else if (height == 0) {
+            height = test_video.height() * width / test_video.width();
+        }
         InitInputTensor(width, height);
 
         // Run.
@@ -172,8 +196,15 @@ class ObjDetector {
         char image_file_name[1000];
         while ((frame = test_video.NextFrame())) {
             std::vector<tensorflow::Tensor> output_tensors;
+            auto mat = AVFrameToMat(frame);
+            if (width != mat->cols || height != mat->rows) {
+                cv::Mat for_tf;
+                cv::resize(*mat, for_tf, cv::Size(width, height));
+                FeedInMat(for_tf);
+            } else {
+                FeedInMat(*mat);
+            }
             const auto start = std::chrono::high_resolution_clock::now();
-            FeedInAVFrame(frame);
             if (!Run(&output_tensors)) return false;
             const std::chrono::duration<double> duration =
                 std::chrono::high_resolution_clock::now() - start;
@@ -182,15 +213,26 @@ class ObjDetector {
             frames++;
             total_ms += elapsed_ms;
             VLOG(0) << frames << ": ms=" << elapsed_ms;
-            auto mat = AVFrameToMat(frame);
+            if (input_channels_ == 3) cv::cvtColor(*mat, *mat, cv::COLOR_RGB2BGR);
             AnnotateMat(*mat, output_tensors);
-            snprintf(image_file_name, sizeof(image_file_name), "%s.%05d.jpeg",
-                     output_name.c_str(), frames);
-            cv::imwrite(image_file_name, *mat);
+            if (output_video) {
+                uint8_t* dst = encode_frame->data[0];
+                for (int row = 0; row < mat->rows; row++) {
+                    memcpy(dst, mat->ptr(row), mat->cols * input_channels_);
+                    dst += encode_frame->linesize[0];
+                }
+                encode_frame->pts = frame->pts;
+                video_encoder->EncodeAVFrame(encode_frame);
+            } else {
+                snprintf(image_file_name, sizeof(image_file_name), "%s.%05d.jpeg",
+                         output_name.c_str(), frames);
+                cv::imwrite(image_file_name, *mat);
+            }
             av_frame_free(&frame);
         }
-        printf("%s: %d frames processed in %d ms(%d mspf).\n",
-               output_name.c_str(), frames, total_ms, total_ms / frames);
+        av_frame_free(&encode_frame);
+        printf("%s: %d %dx%d frames processed in %d ms(%d mspf).\n",
+               output_name.c_str(), frames, width, height, total_ms, total_ms / frames);
         return true;
     }
 
@@ -201,19 +243,25 @@ class ObjDetector {
             LOG(ERROR) << "Failed to read image " << file_name;
             return false;
         }
-        if (width != 0 || height != 0) {
-            if (width == 0) {
-                width = mat.cols * height / mat.rows;
-            } else if (height == 0) {
-                height = mat.rows * width / mat.cols;
-            }
+        if (width == 0 && height == 0) {
+            width = mat.cols;
+            height = mat.rows;
+        } else if (width == 0) {
+            width = mat.cols * height / mat.rows;
+        } else if (height == 0) {
+            height = mat.rows * width / mat.cols;
+        }
+        InitInputTensor(width, height);
+        if (width != mat.cols || height != mat.rows) {
             cv::Mat resized;
             cv::resize(mat, resized, cv::Size(width, height));
-            mat = resized;
+            cv::cvtColor(resized, resized, cv::COLOR_BGR2RGB);
+            FeedInMat(resized);
+        } else {
+            cv::Mat for_tf;
+            cv::cvtColor(mat, for_tf, cv::COLOR_BGR2RGB);
+            FeedInMat(for_tf);
         }
-        InitInputTensor(mat.cols, mat.rows);
-        cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
-        FeedInMat(mat);
         std::vector<tensorflow::Tensor> output_tensors;
         if (!Run(&output_tensors)) return false;
         AnnotateMat(mat, output_tensors);
@@ -328,7 +376,7 @@ class ObjDetector {
         const float* detection_boxes = TensorData<float>(output_tensors[3]);
         for (int i = 0; i < num_detections; i++) {
             const float score = detection_scores[i];
-            if (score < .5f) break;
+            if (score < .3f) break;
             const int cls = detection_classes[i];
             if (cls == 0) continue;
             const int ymin = detection_boxes[4 * i] * mat.rows;
@@ -338,9 +386,9 @@ class ObjDetector {
             VLOG(0) << "Detected " << labels_[cls - 1] << " with score " << score
                 << " @[" << xmin << "," << ymin << ":" << xmax << "," << ymax << "]";
             cv::rectangle(mat, cv::Rect(xmin, ymin, xmax - xmin, ymax - ymin),
-                          cv::Scalar(0, 0, 255), 3);
+                          cv::Scalar(0, 0, 255), 1);
             cv::putText(mat, labels_[cls - 1], cv::Point(xmin, ymin - 5),
-                        cv::FONT_HERSHEY_PLAIN, .8, cv::Scalar(10, 255, 30));
+                        cv::FONT_HERSHEY_COMPLEX, .8, cv::Scalar(10, 255, 30));
         }
     }
 
@@ -358,13 +406,15 @@ class ObjDetector {
 
 int main(int argc, char** argv) {
     google::ParseCommandLineFlags(&argc, &argv, true);
+    google::InitGoogleLogging(argv[0]);
     InitFfmpeg(FLAGS_ffmpeg_log_level);
     std::vector<std::string> labels;
     if (!ReadLines(FLAGS_labels_file, &labels)) return 1;
     ObjDetector obj_detector;
     if (!obj_detector.Init(FLAGS_model_file, labels)) return 1;
     if (!FLAGS_video_file.empty()) {
-        obj_detector.RunVideo(FLAGS_video_file, FLAGS_width, FLAGS_height, FLAGS_output);
+        obj_detector.RunVideo(FLAGS_video_file, FLAGS_width, FLAGS_height, FLAGS_output,
+                              FLAGS_output_video);
     } else if (!FLAGS_image_file.empty()) {
         obj_detector.RunImage(FLAGS_image_file, FLAGS_width, FLAGS_height, FLAGS_output);
     }

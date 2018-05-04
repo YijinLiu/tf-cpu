@@ -78,25 +78,25 @@ run_obj_detect: $(BIN)/obj_detect \
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
 	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v1_coco.jpeg \
 	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt --height=0
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
 	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v2_coco.jpeg \
 	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt --height=0
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
 	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v1_coco.jpeg \
 	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt --height=0
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
 	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v2_coco.jpeg \
 	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt --height=0
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v1_coco \
+	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v1_coco.mkv \
 	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v2_coco \
+	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v2_coco.mkv \
 	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 
@@ -115,11 +115,15 @@ LDFLAGS:=-Wl,-Bstatic -lbenchmark -lglog -lgflags -lstdc++ \
          -lavformat -lavcodec -lavfilter -lavdevice -lswscale -lavutil -lx264 -lz \
          -Wl,-Bdynamic -lpthread -ldl
 
-$(BIN)/test_video.o: test_video.cc test_video.hpp
+$(BIN)/test_video.o: test_video.cc test_video.hpp utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-$(BIN)/classify_lite.o: classify_lite.cc test_video.hpp
+$(BIN)/video_encoder.o: video_encoder.cc video_encoder.hpp utils.hpp
+	mkdir -p $(BIN)
+	g++ -c $(CXXFLAGS) $< -o $@
+
+$(BIN)/classify_lite.o: classify_lite.cc test_video.hpp utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $< -o $@
 
@@ -127,7 +131,7 @@ $(BIN)/classify_lite: $(BIN)/test_video.o $(BIN)/classify_lite.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -ltensorflow-lite -lfarmhash $(LDFLAGS)
 
-$(BIN)/classify.o: classify.cc test_video.hpp
+$(BIN)/classify.o: classify.cc test_video.hpp utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $(BLAS_CXXFLAGS/$(BLAS)) $< -o $@
 
@@ -136,14 +140,14 @@ $(BIN)/classify: $(BIN)/test_video.o $(BIN)/classify.o
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
 	    -Wl,--no-whole-archive -lprotobuf -lnsync $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
-$(BIN)/obj_detect.o: obj_detect.cc test_video.hpp
+$(BIN)/obj_detect.o: obj_detect.cc test_video.hpp video_encoder.hpp utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $(BLAS_CXXFLAGS/$(BLAS)) $< -o $@
 
 OPENCV_LDFLAGS=-lopencv_imgcodecs -lopencv_imgproc -lopencv_core \
     -L/usr/local/share/OpenCV/3rdparty/lib -lippiw -lippicv -llibjpeg
 
-$(BIN)/obj_detect: $(BIN)/test_video.o $(BIN)/obj_detect.o
+$(BIN)/obj_detect: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
 	    -Wl,--no-whole-archive -lprotobuf -lnsync $(OPENCV_LDFLAGS) \

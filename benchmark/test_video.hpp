@@ -1,14 +1,7 @@
 #ifndef TEST_VIDEO_HPP_
 #define TEST_VIDEO_HPP_
 
-#include <string>
-
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavfilter/avfilter.h>
-#include <libavfilter/avfiltergraph.h>
-#include <libavformat/avformat.h>
-}  // extern "C"
+#include "utils.hpp"
 
 class TestVideo {
   public:
@@ -22,6 +15,8 @@ class TestVideo {
 
     uint32_t width() const { return width_; }
     uint32_t height() const { return height_; }
+
+    AVRational time_base() const { return video_->time_base; }
 
   private:
     bool ReadPacket();
@@ -37,7 +32,5 @@ class TestVideo {
     AVFilterContext* in_ = nullptr;
     AVFilterContext* out_ = nullptr;
 };
-
-void InitFfmpeg(int log_level);
 
 #endif  // TEST_VIDEO_HPP_

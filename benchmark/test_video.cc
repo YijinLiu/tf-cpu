@@ -6,52 +6,6 @@
 
 #include <glog/logging.h>
 
-extern "C" {
-
-#include <libavdevice/avdevice.h>
-#include <libavfilter/buffersink.h>
-#include <libavfilter/buffersrc.h>
-#include <libavutil/opt.h>
-#include <libavutil/pixdesc.h>
-#include <libavutil/time.h>
-
-}  // extern "C"
-
-namespace {
-
-#ifndef ARRAYSIZE
-#define ARRAYSIZE(buf) sizeof(buf)/sizeof(buf[0])
-#endif
-
-std::string Sprintf(const char* format, ...) {
-    char buf[1000];
-    va_list ap;
-    va_start(ap, format);
-    vsnprintf(buf, ARRAYSIZE(buf), format, ap);
-    va_end(ap);
-    return buf;
-}
-
-std::string FfmpegErrStr(int rc) {
-    char err_buf[200];
-    if (av_strerror(rc, err_buf, ARRAYSIZE(err_buf)) == 0) {
-        return Sprintf("%s(%d)", err_buf, rc);
-    }
-    return Sprintf("(%d)", rc);
-}
-
-}  // namespace
-
-void InitFfmpeg(int log_level) {
-    setenv("AV_LOG_FORCE_COLOR", "1", 0);
-    avcodec_register_all();
-    av_register_all();
-    avfilter_register_all();
-    avdevice_register_all();
-    avformat_network_init();
-    av_log_set_level(log_level);
-}
-
 TestVideo::TestVideo(enum AVPixelFormat pix_fmt, uint32_t width, uint32_t height)
     : pix_fmt_(pix_fmt), width_(width), height_(height) {}
 
@@ -290,6 +244,7 @@ AVFrame* TestVideo::NextFrame() {
         av_frame_free(&frame);
         return NextFrame();
     }
+    frame->pts = av_frame_get_best_effort_timestamp(frame);
     return frame;
 }
 

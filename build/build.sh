@@ -19,7 +19,7 @@ blas=MKL
 version=1.8.0
 bazel_version=0.11.1
 prefix=/usr/local
-mopts="-march=native"
+mopts="-march=native -mtune=native"
 
 OPTS=`getopt -n 'build.sh' -o b:,m:,p:,v: -l blas:,version:,bazel_version:,prefix:,mopts: -- "$@"`
 rc=$?
@@ -1017,7 +1017,7 @@ index 05e8d90..810c1ac 100644
 +BLAS?=MKL
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
-+BLAS_CXX_FLAGS/MKL:=-DINTEL_MKL -DINTEL_MKL_ML -DEIGEN_USE_MKL_ALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include
++BLAS_CXX_FLAGS/MKL:=-DINTEL_MKL -DINTEL_MKL_ML -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include
 +BLAS_LD_FLAGS/ATLAS:=-L${prefix}/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
 +BLAS_LD_FLAGS/OpenBLAS:=-L${prefix}/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
 +# See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/

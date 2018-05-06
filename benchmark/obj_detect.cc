@@ -26,6 +26,7 @@ DEFINE_int32(width, 320, "");
 DEFINE_int32(height, 0, "");
 DEFINE_string(output, "", "");
 DEFINE_bool(output_video, true, "");
+DEFINE_int32(batch_size, 1, "");
 
 DEFINE_int32(ffmpeg_log_level, 8, "");
 
@@ -43,13 +44,14 @@ bool ReadLines(const std::string& file_name, std::vector<std::string>* lines) {
 }
 
 template<typename T>
-const T* TensorData(const tensorflow::Tensor& tensor);
+const T* TensorData(const tensorflow::Tensor& tensor, int batch_index);
 
 template<>
-const float* TensorData(const tensorflow::Tensor& tensor) {
+const float* TensorData(const tensorflow::Tensor& tensor, int batch_index) {
+    int nelems = tensor.dim_size(1) * tensor.dim_size(2) * tensor.dim_size(3);
     switch (tensor.dtype()) {
         case tensorflow::DT_FLOAT:
-            return tensor.flat<float>().data();
+            return tensor.flat<float>().data() + nelems * batch_index;
         default:
             LOG(FATAL) << "Should not reach here!";
     }
@@ -57,10 +59,11 @@ const float* TensorData(const tensorflow::Tensor& tensor) {
 }
 
 template<>
-const uint8_t* TensorData(const tensorflow::Tensor& tensor) {
+const uint8_t* TensorData(const tensorflow::Tensor& tensor, int batch_index) {
+    int nelems = tensor.dim_size(1) * tensor.dim_size(2) * tensor.dim_size(3);
     switch (tensor.dtype()) {
         case tensorflow::DT_UINT8:
-            return tensor.flat<uint8_t>().data();
+            return tensor.flat<uint8_t>().data() + nelems * batch_index;
         default:
             LOG(FATAL) << "Should not reach here!";
     }
@@ -87,6 +90,16 @@ const char num_detections[] = "num_detections";
 const char detection_classes[] = "detection_classes";
 const char detection_scores[] = "detection_scores";
 const char detection_boxes[] = "detection_boxes";
+
+struct AVFrameAndMat {
+    ~AVFrameAndMat() {
+        delete mat;
+        av_frame_free(&frame);
+    }
+
+    AVFrame* frame;
+    cv::Mat* mat;
+};
 
 class ObjDetector {
   public:
@@ -155,7 +168,7 @@ class ObjDetector {
     }
 
 
-    bool RunVideo(const std::string& video_file, int width, int height,
+    bool RunVideo(const std::string& video_file, int width, int height, int batch_size,
                   const std::string& output_name, bool output_video) {
         // Open input video.
         TestVideo test_video(av_pix_fmt(), 0, 0);
@@ -187,48 +200,65 @@ class ObjDetector {
         } else if (height == 0) {
             height = test_video.height() * width / test_video.width();
         }
-        InitInputTensor(width, height);
+        InitInputTensor(batch_size, width, height);
 
         // Run.
         int frames = 0;
         int total_ms = 0;
         AVFrame* frame = nullptr;
-        char image_file_name[1000];
+        std::vector<std::unique_ptr<AVFrameAndMat>> batch(batch_size);
         while ((frame = test_video.NextFrame())) {
-            std::vector<tensorflow::Tensor> output_tensors;
+            // Feed in data.
             auto mat = AVFrameToMat(frame);
+            const int batch_index = frames % batch_size;
             if (width != mat->cols || height != mat->rows) {
                 cv::Mat for_tf;
                 cv::resize(*mat, for_tf, cv::Size(width, height));
-                FeedInMat(for_tf);
+                FeedInMat(for_tf, batch_index);
             } else {
-                FeedInMat(*mat);
+                FeedInMat(*mat, batch_index);
             }
+            batch[batch_index].reset(new AVFrameAndMat{frame, mat.release()});
+            frames++;
+            if (frames % batch_size != 0) continue;
+
+            // Run.
+            std::vector<tensorflow::Tensor> output_tensors;
             const auto start = std::chrono::high_resolution_clock::now();
             if (!Run(&output_tensors)) return false;
             const std::chrono::duration<double> duration =
                 std::chrono::high_resolution_clock::now() - start;
             const auto elapsed_ms =
                 std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-            frames++;
             total_ms += elapsed_ms;
             VLOG(0) << frames << ": ms=" << elapsed_ms;
-            if (input_channels_ == 3) cv::cvtColor(*mat, *mat, cv::COLOR_RGB2BGR);
-            AnnotateMat(*mat, output_tensors);
-            if (output_video) {
-                uint8_t* dst = encode_frame->data[0];
-                for (int row = 0; row < mat->rows; row++) {
-                    memcpy(dst, mat->ptr(row), mat->cols * input_channels_);
-                    dst += encode_frame->linesize[0];
-                }
-                encode_frame->pts = frame->pts;
-                video_encoder->EncodeAVFrame(encode_frame);
-            } else {
-                snprintf(image_file_name, sizeof(image_file_name), "%s.%05d.jpeg",
-                         output_name.c_str(), frames);
-                cv::imwrite(image_file_name, *mat);
+
+            // Annotate.
+            if (input_channels_ == 3) {
+                for (auto& f : batch) cv::cvtColor(*f->mat, *f->mat, cv::COLOR_RGB2BGR);
             }
-            av_frame_free(&frame);
+            for (int i = 0; i < batch_size; i++) {
+                AnnotateMat(*batch[i]->mat, output_tensors, i);
+            }
+            if (output_video) {
+                for (int i = 0; i < batch_size; i++) {
+                    const auto* mat = batch[i]->mat;
+                    uint8_t* dst = encode_frame->data[0];
+                    for (int row = 0; row < mat->rows; row++) {
+                        memcpy(dst, mat->ptr(row), mat->cols * input_channels_);
+                        dst += encode_frame->linesize[0];
+                    }
+                    encode_frame->pts = batch[i]->frame->pts;
+                    video_encoder->EncodeAVFrame(encode_frame);
+                }
+            } else {
+                char image_file_name[1000];
+                for (int i = 0; i < batch_size; i++) {
+                    snprintf(image_file_name, sizeof(image_file_name), "%s.%05d.jpeg",
+                             output_name.c_str(), frames - batch_size + i);
+                    cv::imwrite(image_file_name, *batch[i]->mat);
+                }
+            }
         }
         av_frame_free(&encode_frame);
         printf("%s: %d %dx%d frames processed in %d ms(%d mspf).\n",
@@ -251,20 +281,20 @@ class ObjDetector {
         } else if (height == 0) {
             height = mat.rows * width / mat.cols;
         }
-        InitInputTensor(width, height);
+        InitInputTensor(1, width, height);
         if (width != mat.cols || height != mat.rows) {
             cv::Mat resized;
             cv::resize(mat, resized, cv::Size(width, height));
             cv::cvtColor(resized, resized, cv::COLOR_BGR2RGB);
-            FeedInMat(resized);
+            FeedInMat(resized, 0);
         } else {
             cv::Mat for_tf;
             cv::cvtColor(mat, for_tf, cv::COLOR_BGR2RGB);
-            FeedInMat(for_tf);
+            FeedInMat(for_tf, 0);
         }
         std::vector<tensorflow::Tensor> output_tensors;
         if (!Run(&output_tensors)) return false;
-        AnnotateMat(mat, output_tensors);
+        AnnotateMat(mat, output_tensors, 0);
         cv::imwrite(output, mat);
         return true;
     }
@@ -312,12 +342,12 @@ class ObjDetector {
         }
     }
 
-    void FeedInMat(const cv::Mat& mat) {
-        const int size = input_tensor_->NumElements();
+    void FeedInMat(const cv::Mat& mat, int batch_index) {
+        const int size = mat.rows * mat.cols * input_channels_;
         switch (input_dtype_) {
             case tensorflow::DT_FLOAT:
                 if (input_channels_ == 3) {
-                    float* data = input_tensor_->flat<float>().data();
+                    float* data = input_tensor_->flat<float>().data() + size * batch_index;
                     for (int row = 0; row < mat.rows; row++) {
                         for (int col = 0; col < mat.cols; col++) {
                             const cv::Vec3b& pix = mat.at<cv::Vec3b>(row, col);
@@ -328,7 +358,7 @@ class ObjDetector {
                         }
                     }
                 } else {
-                    float* data = input_tensor_->flat<float>().data();
+                    float* data = input_tensor_->flat<float>().data() + size * batch_index;
                     for (int row = 0; row < mat.rows; row++) {
                         for (int col = 0; col < mat.cols; col++) {
                             data[row * mat.cols + col] = mat.at<uint8_t>(row, col) / 256.f;
@@ -338,7 +368,7 @@ class ObjDetector {
                 break;
             case tensorflow::DT_UINT8:
                 {
-                    uint8_t* dst = input_tensor_->flat<uint8_t>().data();
+                    uint8_t* dst = input_tensor_->flat<uint8_t>().data() + size * batch_index;
                     const int row_elems = mat.cols * input_channels_;
                     for (int row = 0; row < mat.rows; row++) {
                         memcpy(dst, mat.ptr(row), row_elems);
@@ -356,12 +386,12 @@ class ObjDetector {
         return input_channels_ == 3 ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_GRAY8;
     }
 
-    void InitInputTensor(int width, int height) {
+    void InitInputTensor(int batch_size, int width, int height) {
         if (!input_tensor_ || input_tensor_->dim_size(1) != width ||
             input_tensor_->dim_size(2) != height) {
             // Create input tensor.
             tensorflow::TensorShape input_shape;
-            input_shape.AddDim(1);  // batch size
+            input_shape.AddDim(batch_size);
             input_shape.AddDim(height);
             input_shape.AddDim(width);
             input_shape.AddDim(input_channels_);
@@ -369,11 +399,12 @@ class ObjDetector {
         }
     }
 
-    void AnnotateMat(cv::Mat& mat, const std::vector<tensorflow::Tensor>& output_tensors) {
-        const int num_detections = *TensorData<float>(output_tensors[0]);
-        const float* detection_classes = TensorData<float>(output_tensors[1]);
-        const float* detection_scores = TensorData<float>(output_tensors[2]);
-        const float* detection_boxes = TensorData<float>(output_tensors[3]);
+    void AnnotateMat(cv::Mat& mat, const std::vector<tensorflow::Tensor>& output_tensors,
+                     int batch_index) {
+        const int num_detections = *TensorData<float>(output_tensors[0], batch_index);
+        const float* detection_classes = TensorData<float>(output_tensors[1], batch_index);
+        const float* detection_scores = TensorData<float>(output_tensors[2], batch_index);
+        const float* detection_boxes = TensorData<float>(output_tensors[3], batch_index);
         for (int i = 0; i < num_detections; i++) {
             const float score = detection_scores[i];
             if (score < .3f) break;
@@ -413,9 +444,25 @@ int main(int argc, char** argv) {
     ObjDetector obj_detector;
     if (!obj_detector.Init(FLAGS_model_file, labels)) return 1;
     if (!FLAGS_video_file.empty()) {
-        obj_detector.RunVideo(FLAGS_video_file, FLAGS_width, FLAGS_height, FLAGS_output,
-                              FLAGS_output_video);
+        obj_detector.RunVideo(FLAGS_video_file, FLAGS_width, FLAGS_height, FLAGS_batch_size,
+                              FLAGS_output, FLAGS_output_video);
     } else if (!FLAGS_image_file.empty()) {
         obj_detector.RunImage(FLAGS_image_file, FLAGS_width, FLAGS_height, FLAGS_output);
     }
 }
+
+/*
+1. Intel(R) Core(TM) i7-5557U CPU @ 3.10GHz
+w/ MKL
+beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 41257 ms(142 mspf).
+beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 61532 ms(212 mspf).
+
+w/o MKL
+beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 33869 ms(116 mspf).
+beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 37889 ms(130 mspf).
+
+2. Intel(R) Celeron(R) CPU N3450 @ 1.10GHz
+w/o MKL
+beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 242475 ms(836 mspf).
+beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 303421 ms(1046 mspf).
+*/

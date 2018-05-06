@@ -21,6 +21,6 @@ ARG VERSION
 ARG BLAS
 ARG MOPTS
 RUN cd build && \
-    ./build.sh --version=$VERSION --blas=$BLAS --mopts=$MOPTS && \
+    ./build.sh --version=$VERSION --blas=$BLAS --mopts="$MOPTS" && \
     cd .. && \
     rm -rf build

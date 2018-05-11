@@ -8,4 +8,4 @@ default:
 	cd $(WORK_DIR)
 	docker build -t ${USER}/tensorflow-$(shell echo $(BLAS) | tr A-Z a-z)-$(CPU):$(VERSION) \
 	             --build-arg NAME=${USER} --build-arg UID=$(shell id -u) --build-arg GID=$(shell id -g) \
-	             --build-arg VERSION=$(VERSION) --build-arg BLAS=$(BLAS) --build-arg MOPTS="-march=$(CPU) -mtune=$(CPU)" .
+	             --build-arg VERSION=$(VERSION) --build-arg BLAS=$(BLAS) --build-arg MOPTS="-march=$(CPU)" .

@@ -116,6 +116,7 @@ class ObjDetector {
 
         // Create graph.
         tensorflow::SessionOptions sess_opts;
+        sess_opts.config.mutable_device_count()->insert({"CPU", 1});
         sess_opts.config.set_intra_op_parallelism_threads(1);
         sess_opts.config.set_inter_op_parallelism_threads(1);
         sess_opts.config.set_allow_soft_placement(1);
@@ -456,10 +457,12 @@ int main(int argc, char** argv) {
 w/ MKL
 beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 41257 ms(142 mspf).
 beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 61532 ms(212 mspf).
+beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 36411 ms(125 mspf).
 
 w/o MKL
 beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 33869 ms(116 mspf).
 beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 37889 ms(130 mspf).
+beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 30714 ms(105 mspf).
 
 2. Intel(R) Celeron(R) CPU N3450 @ 1.10GHz
 w/o MKL

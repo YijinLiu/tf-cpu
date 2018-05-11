@@ -19,7 +19,7 @@ blas=MKL
 version=1.8.0
 bazel_version=0.11.1
 prefix=/usr/local
-mopts="-march=native -mtune=native"
+mopts="-march=native"
 
 OPTS=`getopt -n 'build.sh' -o b:,m:,p:,v: -l blas:,version:,bazel_version:,prefix:,mopts: -- "$@"`
 rc=$?
@@ -163,7 +163,7 @@ COMPONENTS=DEFAULTS' > l_mkl_${ver}.silent.cfg &&
 
 install_mkl_dnn() {
     if [ ! -d "mkl-dnn" ] ; then
-        git clone --depth=1 https://github.com/intel/mkl-dnn -b v0.13
+        git clone --depth=1 https://github.com/intel/mkl-dnn -b v0.14
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download mkl-dnn source code!${NC}"
@@ -726,7 +726,7 @@ index b4504f2..1cb663e 100644
  # Settings for the host compiler.
  CXX := \$(CC_PREFIX)gcc
 -CXXFLAGS := --std=c++11 -O3 -DNDEBUG
-+CXXFLAGS := --std=c++11 -O3 -DNDEBUG ${mopts} -DEIGEN_DONT_PARALLELIZE
++CXXFLAGS := --std=c++11 -O3 -DNDEBUG ${mopts} -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
  CC := \$(CC_PREFIX)gcc
 -CFLAGS := -O3 -DNDEBUG
 +CFLAGS := -O3 -DNDEBUG ${mopts}
@@ -1017,7 +1017,7 @@ index 05e8d90..810c1ac 100644
 +BLAS?=MKL
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
-+BLAS_CXX_FLAGS/MKL:=-DINTEL_MKL -DINTEL_MKL_ML -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include
++BLAS_CXX_FLAGS/MKL:=-DINTEL_MKL -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include
 +BLAS_LD_FLAGS/ATLAS:=-L${prefix}/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
 +BLAS_LD_FLAGS/OpenBLAS:=-L${prefix}/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
 +# See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
@@ -1027,7 +1027,7 @@ index 05e8d90..810c1ac 100644
  # Settings for the target compiler.
  CXX := \$(CC_PREFIX) gcc
 -OPTFLAGS := -O2
-+OPTFLAGS := -O3 \$(BLAS_CXX_FLAGS/\$(BLAS)) -DEIGEN_DONT_PARALLELIZE
++OPTFLAGS := -O3 \$(BLAS_CXX_FLAGS/\$(BLAS)) -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
  
  ifneq (\$(TARGET),ANDROID)
 -   OPTFLAGS += -march=native

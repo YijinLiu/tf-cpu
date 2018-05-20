@@ -19,8 +19,9 @@ WORKDIR /home/$NAME
 
 ARG VERSION
 ARG BLAS
+ARG MKLDNN_VERSION
 ARG MOPTS
 RUN cd build && \
-    ./build.sh --version=$VERSION --blas=$BLAS --mopts="$MOPTS" && \
+    ./build.sh --version=$VERSION --blas=$BLAS --mkldnn_version=$MKLDNN_VERSION --mopts="$MOPTS" && \
     cd .. && \
     rm -rf build

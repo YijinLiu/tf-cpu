@@ -1,6 +1,7 @@
 .SECONDARY:
 
 PROJECT_ROOT:=$(shell readlink -f $(dir $(lastword $(MAKEFILE_LIST)))/..)
+SRC:=$(PROJECT_ROOT)/benchmark
 BIN:=$(PROJECT_ROOT)/benchmark/bin
 TESTDATA:=$(PROJECT_ROOT)/benchmark/testdata
 
@@ -128,13 +129,26 @@ run_obj_detect: $(BIN)/obj_detect \
 	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 
+train_mnist: $(BIN)/mnist \
+             $(TESTDATA)/mnist_data/train-images-idx3-ubyte \
+             $(TESTDATA)/mnist_data/train-labels-idx1-ubyte \
+             $(TESTDATA)/mnist_data/t10k-images-idx3-ubyte \
+             $(TESTDATA)/mnist_data/t10k-labels-idx1-ubyte
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/mnist -logtostderr -data_dir=$(TESTDATA)/mnist_data
+
 PREFIX?=/usr/local
 BLAS?=MKL
+USE_MKLDNN?=
+BLAS_CXXFLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
+BLAS_CXXFLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
+BLAS_CXXFLAGS/MKL:=-DINTEL_MKL -DEIGEN_USE_MKL_ALL -I$(PREFIX)/intel/mkl/include -I$(PREFIX)/intel/mkldnn/include
 BLAS_LDFLAGS/ATLAS:=-L$(PREFIX)/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
 BLAS_LDFLAGS/OpenBLAS:=-L$(PREFIX)/OpenBLAS/lib -Wl,-Bstatic -lopenblas -lgfortran -lquadmath -Wl,-Bdynamic
 # See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
-BLAS_LDFLAGS/MKL:=-L$(PREFIX)/intel/mkl/lib -L$(PREFIX)/intel/mkldnn/lib -lmkldnn \
-    -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group
+BLAS_LDFLAGS/MKL:=-L$(PREFIX)/intel/mkl/lib -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group
+ifneq ($(USE_MKLDNN),)
+	BLAS_LDFLAGS/MKL:=-L$(PREFIX)/intel/mkldnn/lib -lmkldnn $(BLAS_LDFLAGS/MKL)
+endif
 
 CXXFLAGS:=-g -O3 -pthread -std=c++11 -DNDEBUG -D_POSIX_C_SOURCE=200809L -D_FILE_OFFSET_BITS=64 \
           -fno-exceptions -funwind-tables -fvisibility-inlines-hidden -I$(PREFIX)/include/eigen3
@@ -143,15 +157,15 @@ LDFLAGS:=-Wl,-Bstatic -lbenchmark -lglog -lgflags -lstdc++ \
          -lavformat -lavcodec -lavfilter -lavdevice -lswscale -lavutil -lx264 -lz \
          -Wl,-Bdynamic -lpthread -ldl
 
-$(BIN)/test_video.o: test_video.cc test_video.hpp utils.hpp
+$(BIN)/test_video.o: $(SRC)/test_video.cc $(SRC)/test_video.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-$(BIN)/video_encoder.o: video_encoder.cc video_encoder.hpp utils.hpp
+$(BIN)/video_encoder.o: $(SRC)/video_encoder.cc $(SRC)/video_encoder.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-$(BIN)/classify_lite.o: classify_lite.cc test_video.hpp utils.hpp
+$(BIN)/classify_lite.o: $(SRC)/classify_lite.cc $(SRC)/test_video.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $< -o $@
 
@@ -159,7 +173,7 @@ $(BIN)/classify_lite: $(BIN)/test_video.o $(BIN)/classify_lite.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -ltensorflow-lite -lfarmhash $(LDFLAGS)
 
-$(BIN)/classify.o: classify.cc test_video.hpp utils.hpp
+$(BIN)/classify.o: $(SRC)/classify.cc $(SRC)/test_video.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $(BLAS_CXXFLAGS/$(BLAS)) $< -o $@
 
@@ -168,7 +182,8 @@ $(BIN)/classify: $(BIN)/test_video.o $(BIN)/classify.o
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
 	    -Wl,--no-whole-archive -lprotobuf -lnsync $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
-$(BIN)/obj_detect_lite.o: obj_detect_lite.cc test_video.hpp video_encoder.hpp utils.hpp
+$(BIN)/obj_detect_lite.o: $(SRC)/obj_detect_lite.cc $(SRC)/test_video.hpp \
+                          $(SRC)/video_encoder.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $< -o $@
 
@@ -188,6 +203,17 @@ $(BIN)/obj_detect: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect.
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
 	    -Wl,--no-whole-archive -lprotobuf -lnsync $(OPENCV_LDFLAGS) \
 	    $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+
+$(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
+	g++ -c $(CXXFLAGS) $(BLAS_CXXFLAGS/$(BLAS)) $< -o $@
+
+$(BIN)/mnist.o: $(SRC)/mnist.cc $(SRC)/simple_network.hpp
+	g++ -c $(CXXFLAGS) $(BLAS_CXXFLAGS/$(BLAS)) $< -o $@
+
+$(BIN)/mnist: $(BIN)/mnist.o $(BIN)/simple_network.o
+	mkdir -p $(BIN)
+	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
+	    -Wl,--no-whole-archive -lprotobuf -lnsync $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(TESTDATA)/mobilenet_v1_%.tflite: $(PROJECT_ROOT)/models/mobilenet/v1/mobilenet_v1_%.tgz
 	cd $(TESTDATA) ; tar xf $< ./mobilenet_v1_$*.tflite ; touch $@
@@ -215,6 +241,13 @@ $(PROJECT_ROOT)/models/objdetect/%.tar.gz:
 
 $(TESTDATA)/mobilenet_labels.txt: $(PROJECT_ROOT)/models/mobilenet/labels.txt
 	cp $< $@
+
+$(TESTDATA)/mnist_data/%: $(TESTDATA)/mnist_data/%.gz
+	gunzip -k $<
+
+$(TESTDATA)/mnist_data/%.gz:
+	mkdir -p $(dir $@)
+	wget -O $@ http://yann.lecun.com/exdb/mnist/$(notdir $@)
 
 clean:
 	rm -rf bin

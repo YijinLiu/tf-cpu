@@ -126,6 +126,7 @@ void RunInterpreter(const std::string& model_file, uint32_t width, uint32_t heig
     // Create graph.
     std::unique_ptr<tensorflow::Session> session;
     tensorflow::SessionOptions sess_opts;
+    sess_opts.config.mutable_device_count()->insert({"CPU", 1});
     sess_opts.config.set_intra_op_parallelism_threads(1);
     sess_opts.config.set_inter_op_parallelism_threads(1);
     sess_opts.config.set_allow_soft_placement(1);
@@ -308,187 +309,94 @@ int main(int argc, char** argv) {
 }
 
 /*
-1. Intel(R) Core(TM) i3-4130 CPU @ 3.40GHz
-w/ MKL
-BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time        1082 ms         93 ms          5 correct=35 frames=80 ms=5.375k wrong=45
-BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time         869 ms         87 ms          6 correct=54 frames=96 ms=5.17k wrong=42
-BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time         721 ms         79 ms          7 correct=49 frames=112 ms=4.99k wrong=63
-BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time         585 ms         57 ms         12 correct=84 frames=192 ms=6.912k wrong=108
-BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time        727 ms         53 ms          8 correct=64 frames=128 ms=5.751k wrong=64
-BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time        610 ms         60 ms          9 correct=72 frames=144 ms=5.422k wrong=72
-BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time        478 ms         48 ms         14 correct=98 frames=224 ms=6.581k wrong=126
-BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time        400 ms         44 ms         17 correct=119 frames=272 ms=6.651k wrong=153
-BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time              1136 ms         71 ms          5 correct=35 frames=80 ms=5.641k wrong=45
-BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time               896 ms         68 ms          7 correct=63 frames=112 ms=6.214k wrong=49
-BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time               709 ms         60 ms          8 correct=64 frames=128 ms=5.609k wrong=64
-BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time               575 ms         55 ms          9 correct=63 frames=144 ms=5.101k wrong=81
-BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time              724 ms         47 ms          8 correct=64 frames=128 ms=5.729k wrong=64
-BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time              577 ms         51 ms         10 correct=80 frames=160 ms=5.687k wrong=80
-BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time              482 ms         48 ms         11 correct=77 frames=176 ms=5.211k wrong=99
-BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time              434 ms         45 ms         13 correct=65 frames=208 ms=5.532k wrong=143
-BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time              1788 ms        144 ms          3 correct=24 frames=48 ms=5.336k wrong=24
-BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time              1527 ms         98 ms          4 correct=32 frames=64 ms=6.078k wrong=32
-BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time              1120 ms         66 ms          5 correct=30 frames=80 ms=5.559k wrong=50
-BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time               914 ms         69 ms          6 correct=48 frames=96 ms=5.432k wrong=48
-BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time               768 ms         62 ms          7 correct=49 frames=112 ms=5.321k wrong=63
-BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time               669 ms         57 ms          8 correct=56 frames=128 ms=5.282k wrong=72
-BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time                603 ms         57 ms          9 correct=54 frames=144 ms=5.36k wrong=90
-BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time             1015 ms         71 ms          5 correct=35 frames=80 ms=5.037k wrong=45
-BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              825 ms         62 ms          7 correct=49 frames=112 ms=5.718k wrong=63
-BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              704 ms         56 ms          8 correct=64 frames=128 ms=5.561k wrong=64
-BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              598 ms         51 ms          9 correct=63 frames=144 ms=5.311k wrong=81
-BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               583 ms         49 ms         10 correct=20 frames=160 ms=5.751k wrong=140
+1. Intel(R) Core(TM) i5-5575R CPU @ 2.80GHz
+w/ MKLDNN (_MklConv2D disabled)
+BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time         701 ms         63 ms         10 correct=70 frames=160 ms=6.924k wrong=90
+BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time         533 ms         70 ms         13 correct=117 frames=208 ms=6.818k wrong=91
+BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time         380 ms         53 ms         18 correct=126 frames=288 ms=6.69k wrong=162
+BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time         259 ms         45 ms         26 correct=182 frames=416 ms=6.536k wrong=234
+BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time        491 ms         51 ms         11 correct=88 frames=176 ms=5.313k wrong=88
+BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time        365 ms         52 ms         19 correct=152 frames=304 ms=6.783k wrong=152
+BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time        259 ms         44 ms         26 correct=182 frames=416 ms=6.511k wrong=234
+BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time        175 ms         39 ms         37 correct=259 frames=592 ms=6.186k wrong=333
+BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time              1717 ms         94 ms          4 correct=28 frames=64 ms=6.838k wrong=36
+BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time              1286 ms         89 ms          5 correct=45 frames=80 ms=6.386k wrong=35
+BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time               931 ms         77 ms          6 correct=48 frames=96 ms=5.532k wrong=48
+BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time               631 ms         63 ms          8 correct=56 frames=128 ms=4.976k wrong=72
+BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time             1263 ms         66 ms          5 correct=40 frames=80 ms=6.281k wrong=40
+BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time              943 ms         67 ms          6 correct=48 frames=96 ms=5.613k wrong=48
+BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time              661 ms         54 ms          9 correct=63 frames=144 ms=5.876k wrong=81
+BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time              447 ms         47 ms         12 correct=60 frames=192 ms=5.266k wrong=132
+BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time              1574 ms        117 ms          4 correct=32 frames=64 ms=6.261k wrong=32
+BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time              1459 ms        108 ms          4 correct=32 frames=64 ms=5.803k wrong=32
+BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time              1058 ms         71 ms          6 correct=36 frames=96 ms=6.302k wrong=60
+BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time               788 ms         73 ms          7 correct=56 frames=112 ms=5.46k wrong=56
+BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time               565 ms         62 ms          9 correct=63 frames=144 ms=5.02k wrong=81
+BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time               381 ms         46 ms         18 correct=126 frames=288 ms=6.704k wrong=162
+BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time                245 ms         42 ms         27 correct=162 frames=432 ms=6.4k wrong=270
+BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time              878 ms         60 ms          7 correct=49 frames=112 ms=6.095k wrong=63
+BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              661 ms         64 ms          8 correct=56 frames=128 ms=5.218k wrong=72
+BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              473 ms         54 ms         11 correct=88 frames=176 ms=5.114k wrong=88
+BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              315 ms         42 ms         22 correct=154 frames=352 ms=6.721k wrong=198
+BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               199 ms         38 ms         33 correct=66 frames=528 ms=6.294k wrong=462
 
-w/o MKL
-BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time         722 ms         70 ms          7 correct=49 frames=112 ms=4.998k wrong=63
-BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time         526 ms         61 ms         13 correct=117 frames=208 ms=6.728k wrong=91
-BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time         374 ms         50 ms         18 correct=126 frames=288 ms=6.595k wrong=162
-BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time         257 ms         43 ms         26 correct=182 frames=416 ms=6.463k wrong=234
-BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time        471 ms         44 ms         11 correct=88 frames=176 ms=5.107k wrong=88
-BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time        361 ms         49 ms         20 correct=160 frames=320 ms=7.065k wrong=160
-BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time        254 ms         42 ms         26 correct=182 frames=416 ms=6.391k wrong=234
-BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time        174 ms         38 ms         35 correct=245 frames=560 ms=5.794k wrong=315
-BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time              2545 ms         94 ms          3 correct=21 frames=48 ms=7.609k wrong=27
-BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time              1929 ms        101 ms          3 correct=27 frames=48 ms=5.761k wrong=21
-BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time              1386 ms         92 ms          4 correct=32 frames=64 ms=5.517k wrong=32
-BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time               926 ms         61 ms          7 correct=49 frames=112 ms=6.424k wrong=63
-BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time             1822 ms         59 ms          4 correct=32 frames=64 ms=7.256k wrong=32
-BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time             1412 ms         65 ms          5 correct=40 frames=80 ms=7.018k wrong=40
-BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time              987 ms         54 ms          7 correct=49 frames=112 ms=6.849k wrong=63
-BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time              622 ms         46 ms          9 correct=45 frames=144 ms=5.527k wrong=99
-BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time              2100 ms        122 ms          3 correct=24 frames=48 ms=6.278k wrong=24
-BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time              1899 ms        109 ms          3 correct=24 frames=48 ms=5.676k wrong=24
-BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time              1361 ms         61 ms          5 correct=30 frames=80 ms=6.768k wrong=50
-BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time              1024 ms         66 ms          6 correct=48 frames=96 ms=6.093k wrong=48
-BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time               717 ms         54 ms          8 correct=56 frames=128 ms=5.674k wrong=72
-BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time               503 ms         49 ms         11 correct=77 frames=176 ms=5.454k wrong=99
-BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time                285 ms         40 ms         23 correct=138 frames=368 ms=6.362k wrong=230
-BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time             1143 ms         50 ms          6 correct=42 frames=96 ms=6.809k wrong=54
-BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              854 ms         57 ms          7 correct=49 frames=112 ms=5.919k wrong=63
-BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              602 ms         50 ms          9 correct=72 frames=144 ms=5.343k wrong=72
-BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              413 ms         43 ms         13 correct=91 frames=208 ms=5.274k wrong=117
-BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               234 ms         36 ms         28 correct=56 frames=448 ms=6.29k wrong=392
+w/ MKL (_MklConv2D disabled)
+BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time         676 ms         64 ms         10 correct=70 frames=160 ms=6.684k wrong=90
+BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time         510 ms         64 ms         13 correct=117 frames=208 ms=6.534k wrong=91
+BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time         367 ms         53 ms         19 correct=133 frames=304 ms=6.819k wrong=171
+BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time         249 ms         45 ms         27 correct=189 frames=432 ms=6.508k wrong=243
+BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time        475 ms         50 ms         11 correct=88 frames=176 ms=5.153k wrong=88
+BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time        352 ms         51 ms         20 correct=160 frames=320 ms=6.878k wrong=160
+BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time        252 ms         45 ms         27 correct=189 frames=432 ms=6.603k wrong=243
+BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time        170 ms         39 ms         38 correct=266 frames=608 ms=6.193k wrong=342
+BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time              1123 ms         81 ms          5 correct=35 frames=80 ms=5.577k wrong=45
+BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time               789 ms         75 ms          7 correct=63 frames=112 ms=5.466k wrong=49
+BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time               545 ms         56 ms         13 correct=104 frames=208 ms=6.978k wrong=104
+BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time               357 ms         47 ms         19 correct=133 frames=304 ms=6.637k wrong=171
+BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time              664 ms         51 ms          9 correct=72 frames=144 ms=5.904k wrong=72
+BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time              480 ms         55 ms         11 correct=88 frames=176 ms=5.191k wrong=88
+BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time              335 ms         45 ms         20 correct=140 frames=320 ms=6.551k wrong=180
+BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time              222 ms         40 ms         30 correct=150 frames=480 ms=6.422k wrong=330
+BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time               966 ms         87 ms          6 correct=48 frames=96 ms=5.748k wrong=48
+BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time               920 ms         82 ms          6 correct=48 frames=96 ms=5.471k wrong=48
+BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time               662 ms         60 ms          8 correct=48 frames=128 ms=5.234k wrong=80
+BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time               482 ms         56 ms         14 correct=112 frames=224 ms=6.627k wrong=112
+BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time               341 ms         48 ms         20 correct=140 frames=320 ms=6.666k wrong=180
+BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time               222 ms         41 ms         30 correct=210 frames=480 ms=6.442k wrong=270
+BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time                144 ms         37 ms         44 correct=264 frames=704 ms=5.941k wrong=440
+BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time              536 ms         52 ms         10 correct=70 frames=160 ms=5.282k wrong=90
+BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              398 ms         52 ms         18 correct=126 frames=288 ms=7.031k wrong=162
+BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              278 ms         45 ms         24 correct=192 frames=384 ms=6.467k wrong=192
+BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              180 ms         39 ms         36 correct=252 frames=576 ms=6.143k wrong=324
+BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               117 ms         37 ms         53 correct=106 frames=848 ms=5.786k wrong=742
 
-2. Intel(R) Celeron(R) CPU N3350 @ 1.10GHz
-w/ MKL
-BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time       11400 ms        959 ms          1 correct=7 frames=16 ms=11.393k wrong=9
-BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time        9993 ms        892 ms          1 correct=9 frames=16 ms=9.984k wrong=7
-BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time        9213 ms        846 ms          1 correct=6 frames=16 ms=9.204k wrong=10
-BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time        8678 ms        844 ms          1 correct=7 frames=16 ms=8.67k wrong=9
-BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time       3355 ms        338 ms          2 correct=16 frames=32 ms=6.695k wrong=16
-BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time       2826 ms        350 ms          2 correct=16 frames=32 ms=5.635k wrong=16
-BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time       2297 ms        249 ms          3 correct=21 frames=48 ms=6.872k wrong=27
-BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time       1981 ms        246 ms          3 correct=21 frames=48 ms=5.917k wrong=27
-BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time             11140 ms        701 ms          1 correct=7 frames=16 ms=11.133k wrong=9
-BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time              9885 ms        688 ms          1 correct=9 frames=16 ms=9.878k wrong=7
-BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time              8933 ms        694 ms          1 correct=8 frames=16 ms=8.924k wrong=8
-BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time              8299 ms        691 ms          1 correct=7 frames=16 ms=8.29k wrong=9
-BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time             3451 ms        267 ms          2 correct=16 frames=32 ms=6.886k wrong=16
-BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time             2895 ms        284 ms          2 correct=16 frames=32 ms=5.772k wrong=16
-BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time             2346 ms        207 ms          3 correct=21 frames=48 ms=7.017k wrong=27
-BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time             2033 ms        207 ms          3 correct=15 frames=48 ms=6.074k wrong=33
-BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time              7823 ms        979 ms          1 correct=8 frames=16 ms=7.813k wrong=8
-BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time              6969 ms        830 ms          1 correct=8 frames=16 ms=6.962k wrong=8
-BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time              4337 ms        335 ms          2 correct=12 frames=32 ms=8.656k wrong=20
-BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time              3597 ms        363 ms          2 correct=16 frames=32 ms=7.18k wrong=16
-BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time              2973 ms        355 ms          2 correct=14 frames=32 ms=5.926k wrong=18
-BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time              2371 ms        256 ms          3 correct=21 frames=48 ms=7.087k wrong=27
-BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time               2044 ms        256 ms          3 correct=18 frames=48 ms=6.108k wrong=30
-BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time             3364 ms        300 ms          2 correct=14 frames=32 ms=6.712k wrong=18
-BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time             2784 ms        331 ms          2 correct=14 frames=32 ms=5.553k wrong=18
-BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time             2230 ms        239 ms          3 correct=24 frames=48 ms=6.666k wrong=24
-BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time             1864 ms        234 ms          3 correct=21 frames=48 ms=5.569k wrong=27
-BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time              1571 ms        192 ms          4 correct=8 frames=64 ms=6.251k wrong=56
-
-3. Intel(R) Core(TM) i7-5557U CPU @ 3.10GHz
-w/ MKL
-BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time         903 ms         63 ms          8 correct=56 frames=128 ms=7.164k wrong=72
-BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time         729 ms         75 ms          7 correct=63 frames=112 ms=5.042k wrong=49
-BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time         586 ms         56 ms         12 correct=84 frames=192 ms=6.941k wrong=108
-BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time         484 ms         51 ms         14 correct=98 frames=224 ms=6.672k wrong=126
-BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time        618 ms         48 ms          9 correct=72 frames=144 ms=5.489k wrong=72
-BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time        501 ms         54 ms         10 correct=80 frames=160 ms=4.921k wrong=80
-BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time        402 ms         44 ms         17 correct=119 frames=272 ms=6.746k wrong=153
-BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time        334 ms         39 ms         21 correct=147 frames=336 ms=6.878k wrong=189
-BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time               979 ms         63 ms          6 correct=42 frames=96 ms=5.831k wrong=54
-BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time               765 ms         68 ms          7 correct=63 frames=112 ms=5.302k wrong=49
-BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time               614 ms         59 ms          9 correct=72 frames=144 ms=5.46k wrong=72
-BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time               489 ms         46 ms         14 correct=98 frames=224 ms=6.759k wrong=126
-BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time              651 ms         43 ms          9 correct=72 frames=144 ms=5.794k wrong=72
-BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time              515 ms         49 ms         11 correct=88 frames=176 ms=5.567k wrong=88
-BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time              432 ms         46 ms         12 correct=84 frames=192 ms=5.096k wrong=108
-BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time              344 ms         38 ms         20 correct=100 frames=320 ms=6.722k wrong=220
-BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time              1463 ms        104 ms          4 correct=32 frames=64 ms=5.825k wrong=32
-BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time              1312 ms         81 ms          5 correct=40 frames=80 ms=6.522k wrong=40
-BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time               989 ms         59 ms          6 correct=36 frames=96 ms=5.885k wrong=60
-BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time               804 ms         63 ms          7 correct=56 frames=112 ms=5.575k wrong=56
-BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time               670 ms         57 ms          8 correct=56 frames=128 ms=5.287k wrong=72
-BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time               561 ms         52 ms          9 correct=63 frames=144 ms=4.994k wrong=81
-BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time                481 ms         48 ms         11 correct=66 frames=176 ms=5.191k wrong=110
-BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time              848 ms         51 ms          7 correct=49 frames=112 ms=5.882k wrong=63
-BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              721 ms         58 ms          8 correct=56 frames=128 ms=5.706k wrong=72
-BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              605 ms         53 ms          9 correct=72 frames=144 ms=5.365k wrong=72
-BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              511 ms         46 ms         11 correct=77 frames=176 ms=5.518k wrong=99
-BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               452 ms         44 ms         12 correct=24 frames=192 ms=5.314k wrong=168
-
-w/o MKL
-BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time         664 ms         71 ms          8 correct=56 frames=128 ms=5.24k wrong=72
-BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time         476 ms         62 ms         14 correct=126 frames=224 ms=6.517k wrong=98
-BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time         343 ms         52 ms         20 correct=140 frames=320 ms=6.674k wrong=180
-BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time         236 ms         44 ms         27 correct=189 frames=432 ms=6.151k wrong=243
-BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time        453 ms         47 ms         16 correct=128 frames=256 ms=7.133k wrong=128
-BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time        330 ms         51 ms         21 correct=168 frames=336 ms=6.75k wrong=168
-BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time        233 ms         44 ms         29 correct=203 frames=464 ms=6.497k wrong=261
-BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time        158 ms         38 ms         41 correct=287 frames=656 ms=6.148k wrong=369
-BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time              2486 ms         95 ms          3 correct=21 frames=48 ms=7.437k wrong=27
-BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time              1819 ms         88 ms          4 correct=36 frames=64 ms=7.239k wrong=28
-BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time              1282 ms         74 ms          5 correct=40 frames=80 ms=6.364k wrong=40
-BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time               834 ms         59 ms          7 correct=49 frames=112 ms=5.782k wrong=63
-BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time             1800 ms         65 ms          4 correct=32 frames=64 ms=7.171k wrong=32
-BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time             1329 ms         67 ms          5 correct=40 frames=80 ms=6.604k wrong=40
-BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time              932 ms         55 ms          7 correct=49 frames=112 ms=6.463k wrong=63
-BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time              609 ms         46 ms         10 correct=50 frames=160 ms=6.002k wrong=110
-BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time              2027 ms        121 ms          3 correct=24 frames=48 ms=6.056k wrong=24
-BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time              1857 ms        112 ms          3 correct=24 frames=48 ms=5.546k wrong=24
-BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time              1359 ms         67 ms          5 correct=30 frames=80 ms=6.752k wrong=50
-BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time              1006 ms         70 ms          6 correct=48 frames=96 ms=5.994k wrong=48
-BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time               708 ms         58 ms          8 correct=56 frames=128 ms=5.605k wrong=72
-BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time               468 ms         49 ms         11 correct=77 frames=176 ms=5.036k wrong=99
-BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time                276 ms         39 ms         24 correct=144 frames=384 ms=6.42k wrong=240
-BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time             1146 ms         57 ms          6 correct=42 frames=96 ms=6.829k wrong=54
-BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              840 ms         61 ms          7 correct=49 frames=112 ms=5.823k wrong=63
-BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              590 ms         51 ms         10 correct=80 frames=160 ms=5.822k wrong=80
-BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              382 ms         41 ms         18 correct=126 frames=288 ms=6.768k wrong=162
-BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               227 ms         37 ms         30 correct=60 frames=480 ms=6.499k wrong=420
-
-4. Intel(R) Celeron(R) CPU N3450 @ 1.10GHz
-w/o MKL
-BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time        6514 ms       1124 ms          1 correct=7 frames=16 ms=6.506k wrong=9
-BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time        5001 ms       1120 ms          1 correct=9 frames=16 ms=4.991k wrong=7
-BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time        3301 ms        607 ms          2 correct=12 frames=32 ms=6.589k wrong=20
-BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time        2198 ms        432 ms          3 correct=21 frames=48 ms=6.569k wrong=27
-BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time       3929 ms        449 ms          2 correct=16 frames=32 ms=7.841k wrong=16
-BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time       2945 ms        478 ms          2 correct=16 frames=32 ms=5.876k wrong=16
-BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time       2081 ms        348 ms          3 correct=21 frames=48 ms=6.218k wrong=27
-BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time       1369 ms        279 ms          4 correct=28 frames=64 ms=5.448k wrong=36
-BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time              8103 ms        746 ms          1 correct=7 frames=16 ms=8.093k wrong=9
-BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time              6147 ms        783 ms          1 correct=9 frames=16 ms=6.138k wrong=7
-BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time              4208 ms        446 ms          2 correct=16 frames=32 ms=8.399k wrong=16
-BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time              2874 ms        432 ms          2 correct=14 frames=32 ms=5.729k wrong=18
-BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time             5630 ms        569 ms          1 correct=8 frames=16 ms=5.623k wrong=8
-BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time             4053 ms        363 ms          2 correct=16 frames=32 ms=8.09k wrong=16
-BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time             2903 ms        349 ms          2 correct=14 frames=32 ms=5.786k wrong=18
-BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time             1850 ms        259 ms          3 correct=15 frames=48 ms=5.529k wrong=33
-BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time              8482 ms       1003 ms          1 correct=8 frames=16 ms=8.472k wrong=8
-BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time              7721 ms        925 ms          1 correct=8 frames=16 ms=7.714k wrong=8
-BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time              5449 ms        730 ms          1 correct=6 frames=16 ms=5.44k wrong=10
-BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time              3826 ms        433 ms          2 correct=16 frames=32 ms=7.637k wrong=16
-BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time              2770 ms        424 ms          2 correct=14 frames=32 ms=5.519k wrong=18
-BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time              1793 ms        310 ms          3 correct=21 frames=48 ms=5.354k wrong=27
-BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time               1061 ms        226 ms          5 correct=30 frames=80 ms=5.264k wrong=50
-BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time             4095 ms        364 ms          2 correct=14 frames=32 ms=8.173k wrong=18
-BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time             3052 ms        388 ms          2 correct=14 frames=32 ms=6.089k wrong=18
-BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time             2124 ms        286 ms          3 correct=24 frames=48 ms=6.349k wrong=24
-BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time             1384 ms        234 ms          4 correct=28 frames=64 ms=5.504k wrong=36
-BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               834 ms        189 ms          6 correct=12 frames=96 ms=4.948k wrong=84
+w/o BLAS
+BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time         680 ms         65 ms         10 correct=70 frames=160 ms=6.722k wrong=90
+BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time         508 ms         62 ms         14 correct=126 frames=224 ms=7.003k wrong=98
+BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time         366 ms         54 ms         18 correct=126 frames=288 ms=6.455k wrong=162
+BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time         252 ms         46 ms         27 correct=189 frames=432 ms=6.585k wrong=243
+BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time        468 ms         50 ms         11 correct=88 frames=176 ms=5.061k wrong=88
+BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time        351 ms         51 ms         20 correct=160 frames=320 ms=6.848k wrong=160
+BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time        250 ms         45 ms         27 correct=189 frames=432 ms=6.56k wrong=243
+BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time        168 ms         39 ms         39 correct=273 frames=624 ms=6.295k wrong=351
+BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time              2589 ms         95 ms          3 correct=21 frames=48 ms=7.743k wrong=27
+BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time              1922 ms        105 ms          3 correct=27 frames=48 ms=5.741k wrong=21
+BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time              1355 ms         78 ms          5 correct=40 frames=80 ms=6.741k wrong=40
+BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time               887 ms         62 ms          7 correct=49 frames=112 ms=6.154k wrong=63
+BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time             1886 ms         62 ms          4 correct=32 frames=64 ms=7.509k wrong=32
+BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time             1401 ms         64 ms          5 correct=40 frames=80 ms=6.975k wrong=40
+BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time              985 ms         56 ms          6 correct=42 frames=96 ms=5.864k wrong=54
+BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time              635 ms         45 ms         10 correct=50 frames=160 ms=6.275k wrong=110
+BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time              2114 ms        127 ms          3 correct=24 frames=48 ms=6.319k wrong=24
+BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time              1941 ms        117 ms          3 correct=24 frames=48 ms=5.803k wrong=24
+BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time              1435 ms         79 ms          4 correct=24 frames=64 ms=5.707k wrong=40
+BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time              1057 ms         71 ms          6 correct=48 frames=96 ms=6.296k wrong=48
+BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time               741 ms         59 ms          8 correct=56 frames=128 ms=5.873k wrong=72
+BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time               487 ms         50 ms         11 correct=77 frames=176 ms=5.264k wrong=99
+BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time                290 ms         41 ms         23 correct=138 frames=368 ms=6.505k wrong=230
+BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time             1192 ms         60 ms          5 correct=35 frames=80 ms=5.918k wrong=45
+BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              881 ms         61 ms          7 correct=49 frames=112 ms=6.109k wrong=63
+BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              619 ms         52 ms          9 correct=72 frames=144 ms=5.5k wrong=72
+BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              407 ms         45 ms         13 correct=91 frames=208 ms=5.196k wrong=117
+BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               241 ms         37 ms         28 correct=56 frames=448 ms=6.513k wrong=392
 */

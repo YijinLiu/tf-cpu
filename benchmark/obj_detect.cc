@@ -453,19 +453,19 @@ int main(int argc, char** argv) {
 }
 
 /*
-1. Intel(R) Core(TM) i7-5557U CPU @ 3.10GHz
-w/ MKL
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 41257 ms(142 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 61532 ms(212 mspf).
-beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 36411 ms(125 mspf).
+1. Intel(R) Core(TM) i5-5575R CPU @ 2.80GHz
+w/ MKLDNN (_MklConv2D disabled)
+beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 37664 ms(129 mspf).
+beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 42045 ms(144 mspf).
+beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 31160 ms(107 mspf).
 
-w/o MKL
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 33869 ms(116 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 37889 ms(130 mspf).
-beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 30714 ms(105 mspf).
+w/ MKL (_MklConv2D disabled)
+beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 37324 ms(128 mspf).
+beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 42126 ms(145 mspf).
+beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 29235 ms(100 mspf).
 
-2. Intel(R) Celeron(R) CPU N3450 @ 1.10GHz
-w/o MKL
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 242475 ms(836 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 303421 ms(1046 mspf).
+w/o BLAS
+beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 37664 ms(129 mspf).
+beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 40257 ms(138 mspf).
+beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 31705 ms(109 mspf).
 */

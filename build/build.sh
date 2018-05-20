@@ -17,11 +17,12 @@ usage() {
 
 blas=MKL
 version=1.8.0
-bazel_version=0.11.1
+bazel_version=0.12.0
 prefix=/usr/local
 mopts="-march=native"
+mkldnn_version=
 
-OPTS=`getopt -n 'build.sh' -o b:,m:,p:,v: -l blas:,version:,bazel_version:,prefix:,mopts: -- "$@"`
+OPTS=`getopt -n 'build.sh' -o b:,m:,p:,v: -l blas:,version:,bazel_version:,mkldnn_version:,prefix:,mopts: -- "$@"`
 rc=$?
 if [ $rc != 0 ] ; then
     usage
@@ -32,9 +33,10 @@ while true; do
     case "$1" in
         -b | --blas )               blas="$2" ; shift 2 ;;
         -v | --version )            version="$2" ; shift 2 ;;
-        --bazel_version )           bazel_version="$2" ; shift 2 ;;
         -p | --prefix )             prefix="$2" ; shift 2 ;;
         -m | --mopts )              mopts="$2" ; shift 2 ;;
+        --bazel_version )           bazel_version="$2" ; shift 2 ;;
+        --mkldnn_version )          mkldnn_version="$2" ; shift 2 ;;
         -- ) shift; break ;;
         * ) echo -e "${RED}Invalid option: -$1${NC}" >&2 ; usage ; exit 1 ;;
     esac
@@ -49,7 +51,7 @@ esac
 install_deps() {
     sudo apt update &&
     sudo apt install -y --no-install-recommends autoconf automake build-essential cmake cpio curl \
-        git libtool unzip wget yasm zlib1g-dev $blas_pkgs &&
+        git libtool openjdk-8-jdk python unzip wget yasm zlib1g-dev $blas_pkgs &&
     sudo apt clean
     rc=$?
     if [ $rc != 0 ]; then
@@ -161,7 +163,10 @@ COMPONENTS=DEFAULTS' > l_mkl_${ver}.silent.cfg &&
     fi
 }
 
-install_mkl_dnn() {
+install_mkldnn() {
+    if [ -z "$mkldnn_version" ] ; then
+        return
+    fi
     if [ ! -d "mkl-dnn" ] ; then
         git clone --depth=1 https://github.com/intel/mkl-dnn -b v0.14
         rc=$?
@@ -487,7 +492,7 @@ install_blas() {
     case "$blas" in
         "ATLAS" ) install_atlas ;;
         "OpenBLAS" ) install_openblas ;;
-        "MKL" ) install_mkl && install_mkl_dnn ;;
+        "MKL" ) install_mkl && install_mkldnn ;;
         * ) echo -e "${YELLOW}No BLAS will be install.${NC}"
     esac
 }
@@ -687,7 +692,7 @@ install_neon2sse() {
 
 install_bazel() {
     if [ ! -f bazel_${bazel_version}-linux-x86_64.deb ] ; then
-        wget https://github.com/bazelbuild/bazel/releases/download/${bazel_version}/bazel_${bazel_version}-linux-x86_64.deb
+        wget -O bazel_${bazel_version}-linux-x86_64.deb https://github.com/bazelbuild/bazel/releases/download/${bazel_version}/bazel_${bazel_version}-linux-x86_64.deb
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download Bazel!${NC}"
@@ -702,6 +707,14 @@ install_bazel() {
     fi
 }
 
+mkl_cxxflags="-DINTEL_MKL -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include"
+mkl_ldflags="-L${prefix}/intel/mkl/lib -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
+if [ -z "$mkldnn_version" ] ; then
+    mkl_cxxflags="${mkl_cxxflags} -DINTEL_MKL_ML"
+else
+    mkl_ldflags="-L${prefix}/intel/mkldnn/lib/ -lmkldnn ${mkl_ldflags}"
+fi
+
 install_tensorflow() {
     if [ ! -d tensorflow ] ; then
         git clone --depth=1 https://github.com/tensorflow/tensorflow -b v${version}
@@ -712,8 +725,90 @@ install_tensorflow() {
         fi
         cd tensorflow
         patch -l -p1 <<- EOD
+diff --git a/tensorflow/cc/gradients/nn_grad.cc b/tensorflow/cc/gradients/nn_grad.cc
+index 0cb3132..7346c91 100644
+--- a/tensorflow/cc/gradients/nn_grad.cc
++++ b/tensorflow/cc/gradients/nn_grad.cc
+@@ -59,6 +59,77 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
+ }
+ REGISTER_GRADIENT_OP("LogSoftmax", LogSoftmaxGrad);
+ 
++bool _isZero(const Scope& scope, Output grad){
++  std::array<std::string, 2> zeroOpTypeNames {{"ZerosLike", "Zeros"}};
++  string opTypeName = grad.op().node()->type_string();
++  for(auto& zeroOpTypeName : zeroOpTypeNames){
++    if(opTypeName == zeroOpTypeName){
++      return true;
++    }
++  }
++  //the Operation we were provided is not named something obvious
++  //we need to actually look at its contents.
++  //the original python code did this by calling a utility function called
++  //tensor_util.constant_value. When you dig into tensor_tuil.constant_value
++  //it is a large number of 'if' statements that measure certain edge cases
++  //where it is possible to get the value of the tensor without actually
++  //evaluating it. There are many kinds of tensors that can not have this
++  //done.
++  //There is no C++ equivalent to tensor_util.constant_value so we do nothing
++  //for the moment.
++  return false;
++}
++
++Output _BroadcastMul(const Scope& scope, Output vec, Output mat){
++  /* Multiply after broadcasting vec to match dimensions of mat.
++     Args:
++       vec: A 1-D tensor of dimension [D0]
++       mat: A 2-D tensor of dimesnion [D0, D1]
++    Returns:
++      A tensor of dimension [D0, D1], the result fo vec * mat
++      we use an element for element multiply here.
++  */
++  auto reshaped = ExpandDims(scope, vec, -1);
++  return Multiply(scope, reshaped, mat);
++}
++
++Status SoftmaxCrossEntropyWithLogitsGrad(const Scope& scope,
++                                         const Operation& op,
++                                         const std::vector<Output>& grad_inputs,
++                                         std::vector<Output>* grad_outputs) {
++  // Softmax gradient with cross entropy logits function
++  // We multiply the backprop for cost with the gradients - op.output[1]
++  // There is no gradient for labels
++  auto logits = op.input(0); //the things generated by the network are at
++                             //input index 0. The "truth" labels are at index 1.
++  auto softmax_grad = op.output(1);
++
++  //The documentation for ops::SoftmaxCrossEntropyWithLogits says
++  //loss is the output at index 0, and backprop is the output at index 1
++  auto grad_loss = grad_inputs[0];
++  auto grad_grad = grad_inputs[1];
++
++  auto grad = _BroadcastMul(scope, grad_loss, softmax_grad);
++  if(!_isZero(scope, grad_grad)){
++    std::vector<int> axis;
++    auto logitsSoftmax = Softmax(scope, logits);
++
++    auto grad_gradExpand = ExpandDims(scope, grad_grad, 1);
++    auto logitsSoftMaxExpand = ExpandDims(scope, logitsSoftmax, 2);
++    auto matMulResult = BatchMatMul(scope, grad_gradExpand, logitsSoftMaxExpand);
++    axis.push_back(1);
++    auto squeezeResult = Squeeze(scope, matMulResult, Squeeze::Axis(axis));
++    auto subtractionResult = Subtract(scope, grad_grad, squeezeResult);
++    auto multiplyResult = Multiply(scope, subtractionResult, logitsSoftmax);
++    grad = Add(scope, grad, multiplyResult);
++  }
++  auto minusLogSoftmax = Multiply(scope, LogSoftmax(scope, logits), -1.0f);
++  grad_outputs->push_back(grad);
++  grad_outputs->push_back(_BroadcastMul(scope, grad_loss, minusLogSoftmax));
++  return scope.status();
++}
++REGISTER_GRADIENT_OP("SoftmaxCrossEntropyWithLogits", SoftmaxCrossEntropyWithLogitsGrad);
++
+ Status ReluGradHelper(const Scope& scope, const Operation& op,
+                       const std::vector<Output>& grad_inputs,
+                       std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/contrib/lite/Makefile b/tensorflow/contrib/lite/Makefile
-index b4504f2..1cb663e 100644
+index b4504f2..1bebd39 100644
 --- a/tensorflow/contrib/lite/Makefile
 +++ b/tensorflow/contrib/lite/Makefile
 @@ -1,3 +1,4 @@
@@ -778,160 +873,6 @@ index b4504f2..1cb663e 100644
  
  # Gathers together all the objects we've compiled into a single '.a' archive.
  \$(LIB_PATH): \$(LIB_OBJS)
-diff --git a/tensorflow/contrib/lite/Makefile.orig b/tensorflow/contrib/lite/Makefile.orig
-new file mode 100644
-index 0000000..b4504f2
---- /dev/null
-+++ b/tensorflow/contrib/lite/Makefile.orig
-@@ -0,0 +1,148 @@
-+
-+# Find where we're running from, so we can store generated files here.
-+ifeq (\$(origin MAKEFILE_DIR), undefined)
-+	MAKEFILE_DIR := \$(shell dirname \$(realpath \$(lastword \$(MAKEFILE_LIST))))
-+endif
-+
-+# Try to figure out the host system
-+HOST_OS :=
-+ifeq (\$(OS),Windows_NT)
-+	HOST_OS = WINDOWS
-+else
-+	UNAME_S := \$(shell uname -s)
-+	ifeq (\$(UNAME_S),Linux)
-+	        HOST_OS := LINUX
-+	endif
-+	ifeq (\$(UNAME_S),Darwin)
-+		HOST_OS := OSX
-+	endif
-+endif
-+
-+ARCH := \$(shell if [[ \$(shell uname -m) =~ i[345678]86 ]]; then echo x86_32; else echo \$(shell uname -m); fi)
-+
-+# Where compiled objects are stored.
-+OBJDIR := \$(MAKEFILE_DIR)/gen/obj/
-+BINDIR := \$(MAKEFILE_DIR)/gen/bin/
-+LIBDIR := \$(MAKEFILE_DIR)/gen/lib/
-+GENDIR := \$(MAKEFILE_DIR)/gen/obj/
-+
-+# Settings for the host compiler.
-+CXX := \$(CC_PREFIX)gcc
-+CXXFLAGS := --std=c++11 -O3 -DNDEBUG
-+CC := \$(CC_PREFIX)gcc
-+CFLAGS := -O3 -DNDEBUG
-+LDOPTS :=
-+LDOPTS += -L${prefix}/lib
-+ARFLAGS := -r
-+
-+INCLUDES := \\
-+-I. \\
-+-I\$(MAKEFILE_DIR)/../../../ \\
-+-I\$(MAKEFILE_DIR)/downloads/ \\
-+-I\$(MAKEFILE_DIR)/downloads/eigen \\
-+-I\$(MAKEFILE_DIR)/downloads/gemmlowp \\
-+-I\$(MAKEFILE_DIR)/downloads/neon_2_sse \\
-+-I\$(MAKEFILE_DIR)/downloads/farmhash/src \\
-+-I\$(MAKEFILE_DIR)/downloads/flatbuffers/include \\
-+-I\$(GENDIR)
-+# This is at the end so any globally-installed frameworks like protobuf don't
-+# override local versions in the source tree.
-+INCLUDES += -I${prefix}/include
-+
-+LIBS := \\
-+-lstdc++ \\
-+-lpthread \\
-+-lm \\
-+-lz
-+
-+# If we're on Linux, also link in the dl library.
-+ifeq (\$(HOST_OS),LINUX)
-+	LIBS += -ldl
-+endif
-+
-+include \$(MAKEFILE_DIR)/ios_makefile.inc
-+include \$(MAKEFILE_DIR)/rpi_makefile.inc
-+
-+# This library is the main target for this makefile. It will contain a minimal
-+# runtime that can be linked in to other programs.
-+LIB_NAME := libtensorflow-lite.a
-+LIB_PATH := \$(LIBDIR)\$(LIB_NAME)
-+
-+# A small example program that shows how to link against the library.
-+BENCHMARK_PATH := \$(BINDIR)benchmark_model
-+
-+BENCHMARK_SRCS := \\
-+tensorflow/contrib/lite/tools/benchmark_model.cc
-+BENCHMARK_OBJS := \$(addprefix \$(OBJDIR), \\
-+\$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(BENCHMARK_SRCS))))
-+
-+# What sources we want to compile, must be kept in sync with the main Bazel
-+# build files.
-+
-+CORE_CC_ALL_SRCS := \\
-+\$(wildcard tensorflow/contrib/lite/*.cc) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/*.cc) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/internal/*.cc) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/internal/optimized/*.cc) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/internal/reference/*.cc) \\
-+\$(wildcard tensorflow/contrib/lite/*.c) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/*.c) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/internal/*.c) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/internal/optimized/*.c) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/internal/reference/*.c) \\
-+\$(wildcard tensorflow/contrib/lite/downloads/farmhash/src/farmhash.cc)
-+# Remove any duplicates.
-+CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
-+CORE_CC_EXCLUDE_SRCS := \\
-+\$(wildcard tensorflow/contrib/lite/*test.cc) \\
-+\$(wildcard tensorflow/contrib/lite/*/*test.cc) \\
-+\$(wildcard tensorflow/contrib/lite/*/*/*test.cc) \\
-+\$(wildcard tensorflow/contrib/lite/*/*/*/*test.cc) \\
-+\$(wildcard tensorflow/contrib/lite/kernels/test_util.cc) \\
-+\$(BENCHMARK_SRCS)
-+# Filter out all the excluded files.
-+TF_LITE_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
-+# File names of the intermediate files target compilation generates.
-+TF_LITE_CC_OBJS := \$(addprefix \$(OBJDIR), \\
-+\$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(TF_LITE_CC_SRCS))))
-+LIB_OBJS := \$(TF_LITE_CC_OBJS)
-+
-+# For normal manually-created TensorFlow C++ source files.
-+\$(OBJDIR)%.o: %.cc
-+	@mkdir -p \$(dir \$@)
-+	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) -c \$< -o \$@
-+
-+# For normal manually-created TensorFlow C++ source files.
-+\$(OBJDIR)%.o: %.c
-+	@mkdir -p \$(dir \$@)
-+	\$(CC) \$(CCFLAGS) \$(INCLUDES) -c \$< -o \$@
-+
-+# The target that's compiled if there's no command-line arguments.
-+all: \$(LIB_PATH) \$(BENCHMARK_PATH)
-+
-+# Gathers together all the objects we've compiled into a single '.a' archive.
-+\$(LIB_PATH): \$(LIB_OBJS)
-+	@mkdir -p \$(dir \$@)
-+	\$(AR) \$(ARFLAGS) \$(LIB_PATH) \$(LIB_OBJS)
-+
-+\$(BENCHMARK_PATH): \$(BENCHMARK_OBJS) \$(LIB_PATH)
-+	@mkdir -p \$(dir \$@)
-+	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) \\
-+	-o \$(BENCHMARK_PATH) \$(BENCHMARK_OBJS) \\
-+	\$(LIBFLAGS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS)
-+
-+# Gets rid of all generated files.
-+clean:
-+	rm -rf \$(MAKEFILE_DIR)/gen
-+
-+# Gets rid of target files only, leaving the host alone. Also leaves the lib
-+# directory untouched deliberately, so we can persist multiple architectures
-+# across builds for iOS and Android.
-+cleantarget:
-+	rm -rf \$(OBJDIR)
-+	rm -rf \$(BINDIR)
-+
-+\$(DEPDIR)/%.d: ;
-+.PRECIOUS: \$(DEPDIR)/%.d
-+
-+-include \$(patsubst %,\$(DEPDIR)/%.d,\$(basename \$(TF_CC_SRCS)))
 diff --git a/tensorflow/contrib/lite/interpreter.cc b/tensorflow/contrib/lite/interpreter.cc
 index 4575fe8..4b8bcbc 100644
 --- a/tensorflow/contrib/lite/interpreter.cc
@@ -975,7 +916,7 @@ index 85aca36..d4754b9 100644
  
  // nn api types
 diff --git a/tensorflow/contrib/makefile/Makefile b/tensorflow/contrib/makefile/Makefile
-index 05e8d90..810c1ac 100644
+index 05e8d90..7d6270e 100644
 --- a/tensorflow/contrib/makefile/Makefile
 +++ b/tensorflow/contrib/makefile/Makefile
 @@ -81,15 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
@@ -1010,19 +951,18 @@ index 05e8d90..810c1ac 100644
  
  # If we're on Linux, also link in the dl library.
  ifeq (\$(HOST_OS),LINUX)
-@@ -151,28 +137,29 @@ PROTOGENDIR := \$(GENDIR)proto/
+@@ -151,28 +137,28 @@ PROTOGENDIR := \$(GENDIR)proto/
  DEPDIR := \$(GENDIR)dep/
  \$(shell mkdir -p \$(DEPDIR) >/dev/null)
  
 +BLAS?=MKL
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
-+BLAS_CXX_FLAGS/MKL:=-DINTEL_MKL -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include
++BLAS_CXX_FLAGS/MKL:=${mkl_cxxflags}
 +BLAS_LD_FLAGS/ATLAS:=-L${prefix}/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
 +BLAS_LD_FLAGS/OpenBLAS:=-L${prefix}/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
 +# See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
-+BLAS_LD_FLAGS/MKL:=-L${prefix}/intel/mkl/lib -L${prefix}/intel/mkldnn/lib/ -lmkldnn \\
-+	-Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group
++BLAS_LD_FLAGS/MKL:=${mkl_ldflags}
 +
  # Settings for the target compiler.
  CXX := \$(CC_PREFIX) gcc
@@ -1030,14 +970,14 @@ index 05e8d90..810c1ac 100644
 +OPTFLAGS := -O3 \$(BLAS_CXX_FLAGS/\$(BLAS)) -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
  
  ifneq (\$(TARGET),ANDROID)
--   OPTFLAGS += -march=native
+-  OPTFLAGS += -march=native
 +   OPTFLAGS += ${mopts}
  endif
  
 -CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG \$(OPTFLAGS)
 -LDFLAGS := \\
 --L/usr/local/lib
-+CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD -DNDEBUG \$(OPTFLAGS)
++CXXFLAGS := --std=c++11 -g1 -DIS_SLIM_BUILD -DNDEBUG \$(OPTFLAGS)
 +LDFLAGS := -L${prefix}/lib
  DEPFLAGS = -MT \$@ -MMD -MP -MF \$(DEPDIR)/\$*.Td
  
@@ -1050,11 +990,11 @@ index 05e8d90..810c1ac 100644
 --I\$(MAKEFILE_DIR)/downloads/fft2d \\
 --I\$(PROTOGENDIR) \\
 --I\$(PBTGENDIR)
-+INCLUDES := -I. -I\$(PROTOGENDIR) -I\$(PBTGENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++INCLUDES := -I. -I\$(PROTOGENDIR) -Ibazel-genfiles -I\$(PBTGENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
-@@ -180,12 +167,7 @@ endif
+@@ -180,12 +166,7 @@ endif
  # override local versions in the source tree.
  INCLUDES += -I/usr/local/include
  
@@ -1068,7 +1008,7 @@ index 05e8d90..810c1ac 100644
  
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	PROTOC := \$(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc
-@@ -215,7 +197,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
+@@ -215,7 +196,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	LIBFLAGS += -L\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  	export LD_LIBRARY_PATH=\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  endif
@@ -1076,7 +1016,7 @@ index 05e8d90..810c1ac 100644
  	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
  	LDFLAGS := -Wl,--no-whole-archive
  endif
-@@ -331,7 +312,7 @@ \$(MARCH_OPTION) \\
+@@ -331,7 +311,7 @@ \$(MARCH_OPTION) \\
  -I\$(PBTGENDIR)
  
  	LIBS := \\
@@ -1085,7 +1025,7 @@ index 05e8d90..810c1ac 100644
  -lgnustl_static \\
  -lprotobuf \\
  -llog \\
-@@ -676,10 +657,144 @@ endif  # TEGRA
+@@ -676,10 +656,184 @@ endif  # TEGRA
  # Filter out all the excluded files.
  TF_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
  # Add in any extra files that don't fit the patterns easily
@@ -1093,7 +1033,9 @@ index 05e8d90..810c1ac 100644
 -TF_CC_SRCS += tensorflow/core/common_runtime/gpu/gpu_id_manager.cc
  # Also include the op and kernel definitions.
 -TF_CC_SRCS += \$(shell cat \$(MAKEFILE_DIR)/tf_op_files.txt)
-+TF_CC_SRCS += tensorflow/core/kernels/avgpooling_op.cc \\
++TF_CC_SRCS += tensorflow/core/kernels/argmax_op.cc \\
++              tensorflow/core/kernels/avgpooling_op.cc \\
++              tensorflow/core/kernels/bcast_ops.cc \\
 +              tensorflow/core/kernels/bias_op.cc \\
 +              tensorflow/core/kernels/cast_op.cc \\
 +              tensorflow/core/kernels/cast_op_impl_bfloat.cc \\
@@ -1113,6 +1055,7 @@ index 05e8d90..810c1ac 100644
 +              tensorflow/core/kernels/concat_lib_cpu.cc \\
 +              tensorflow/core/kernels/constant_op.cc \\
 +              tensorflow/core/kernels/conv_ops.cc \\
++              tensorflow/core/kernels/conv_ops_using_gemm.cc \\
 +              tensorflow/core/kernels/crop_and_resize_op.cc \\
 +              tensorflow/core/kernels/cwise_ops_common.cc \\
 +              tensorflow/core/kernels/cwise_op_add_1.cc \\
@@ -1129,6 +1072,7 @@ index 05e8d90..810c1ac 100644
 +              tensorflow/core/kernels/cwise_op_minimum.cc \\
 +              tensorflow/core/kernels/cwise_op_mul_1.cc \\
 +              tensorflow/core/kernels/cwise_op_mul_2.cc \\
++              tensorflow/core/kernels/cwise_op_neg.cc \\
 +              tensorflow/core/kernels/cwise_op_reciprocal.cc \\
 +              tensorflow/core/kernels/cwise_op_round.cc \\
 +              tensorflow/core/kernels/cwise_op_rsqrt.cc \\
@@ -1137,6 +1081,7 @@ index 05e8d90..810c1ac 100644
 +              tensorflow/core/kernels/cwise_op_sub.cc \\
 +              tensorflow/core/kernels/control_flow_ops.cc \\
 +              tensorflow/core/kernels/deep_conv2d.cc \\
++              tensorflow/core/kernels/dense_update_ops.cc \\
 +              tensorflow/core/kernels/depthwise_conv_op.cc \\
 +              tensorflow/core/kernels/fake_quant_ops.cc \\
 +              tensorflow/core/kernels/fill_functor.cc \\
@@ -1152,16 +1097,20 @@ index 05e8d90..810c1ac 100644
 +              tensorflow/core/kernels/neon/neon_depthwise_conv_op.cc \\
 +              tensorflow/core/kernels/non_max_suppression_op.cc \\
 +              tensorflow/core/kernels/no_op.cc \\
++              tensorflow/core/kernels/one_hot_op.cc \\
 +              tensorflow/core/kernels/ops_util.cc \\
 +              tensorflow/core/kernels/pack_op.cc \\
 +              tensorflow/core/kernels/pad_op.cc \\
++              tensorflow/core/kernels/parameterized_truncated_normal_op.cc \\
 +              tensorflow/core/kernels/pooling_ops_common.cc \\
 +              tensorflow/core/kernels/quantized_bias_add_op.cc \\
 +              tensorflow/core/kernels/quantization_utils.cc \\
++              tensorflow/core/kernels/random_op.cc \\
 +              tensorflow/core/kernels/reduction_ops_all.cc \\
 +              tensorflow/core/kernels/reduction_ops_common.cc \\
 +              tensorflow/core/kernels/reduction_ops_max.cc \\
 +              tensorflow/core/kernels/reduction_ops_mean.cc \\
++              tensorflow/core/kernels/reduction_ops_sum.cc \\
 +              tensorflow/core/kernels/relu_op.cc \\
 +              tensorflow/core/kernels/reshape_op.cc \\
 +              tensorflow/core/kernels/resize_bilinear_op.cc \\
@@ -1200,10 +1149,14 @@ index 05e8d90..810c1ac 100644
 +              tensorflow/core/kernels/tile_ops_cpu_impl_6.cc \\
 +              tensorflow/core/kernels/tile_ops_cpu_impl_7.cc \\
 +              tensorflow/core/kernels/topk_op.cc \\
++              tensorflow/core/kernels/training_ops.cc \\
++              tensorflow/core/kernels/training_op_helpers.cc \\
 +              tensorflow/core/kernels/transpose_functor_cpu.cc \\
 +              tensorflow/core/kernels/transpose_op.cc \\
 +              tensorflow/core/kernels/unpack_op.cc \\
++              tensorflow/core/kernels/variable_ops.cc \\
 +              tensorflow/core/kernels/where_op.cc \\
++              tensorflow/core/kernels/xent_op.cc \\
 +              tensorflow/core/ops/array_ops.cc \\
 +              tensorflow/core/ops/control_flow_ops.cc \\
 +              tensorflow/core/ops/data_flow_ops.cc \\
@@ -1213,7 +1166,34 @@ index 05e8d90..810c1ac 100644
 +              tensorflow/core/ops/logging_ops.cc \\
 +              tensorflow/core/ops/math_ops.cc \\
 +              tensorflow/core/ops/nn_ops.cc \\
-+              tensorflow/core/ops/no_op.cc
++              tensorflow/core/ops/no_op.cc \\
++              tensorflow/core/ops/random_ops.cc \\
++              tensorflow/core/ops/state_ops.cc \\
++              tensorflow/core/ops/training_ops.cc \\
++              tensorflow/cc/client/client_session.cc \\
++              tensorflow/cc/framework/gradients.cc \\
++              tensorflow/cc/framework/grad_op_registry.cc \\
++              tensorflow/cc/framework/ops.cc \\
++              tensorflow/cc/framework/scope.cc \\
++              tensorflow/cc/framework/while_gradients.cc \\
++              tensorflow/cc/gradients/array_grad.cc \\
++              tensorflow/cc/gradients/math_grad.cc \\
++              tensorflow/cc/gradients/nn_grad.cc \\
++              tensorflow/cc/ops/const_op.cc \\
++              tensorflow/cc/ops/while_loop.cc \\
++              bazel-genfiles/tensorflow/cc/ops/array_ops.cc \\
++              bazel-genfiles/tensorflow/cc/ops/array_ops_internal.cc \\
++              bazel-genfiles/tensorflow/cc/ops/control_flow_ops.cc \\
++              bazel-genfiles/tensorflow/cc/ops/control_flow_ops_internal.cc \\
++              bazel-genfiles/tensorflow/cc/ops/data_flow_ops.cc \\
++              bazel-genfiles/tensorflow/cc/ops/data_flow_ops_internal.cc \\
++              bazel-genfiles/tensorflow/cc/ops/math_ops.cc \\
++              bazel-genfiles/tensorflow/cc/ops/math_ops_internal.cc \\
++              bazel-genfiles/tensorflow/cc/ops/nn_ops.cc \\
++              bazel-genfiles/tensorflow/cc/ops/nn_ops_internal.cc \\
++              bazel-genfiles/tensorflow/cc/ops/random_ops.cc \\
++              bazel-genfiles/tensorflow/cc/ops/state_ops.cc \\
++              bazel-genfiles/tensorflow/cc/ops/training_ops.cc
 +ifeq (\$(BLAS),MKL)
 +	TF_CC_SRCS += tensorflow/core/kernels/mkl_avgpooling_op.cc \\
 +                  tensorflow/core/kernels/mkl_concat_op.cc \\
@@ -1233,7 +1213,7 @@ index 05e8d90..810c1ac 100644
  PBT_CC_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_pb_text_files.txt)
  PROTO_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_proto_files.txt)
  BENCHMARK_SRCS := \\
-@@ -708,15 +823,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
+@@ -708,15 +862,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
  PROTO_OBJS := \$(addprefix \$(OBJDIR), \$(PROTO_SRCS:.proto=.pb.o))
  LIB_OBJS := \$(PROTO_OBJS) \$(TF_CC_OBJS) \$(PBT_OBJS)
  BENCHMARK_OBJS := \$(addprefix \$(OBJDIR), \$(BENCHMARK_SRCS:.cc=.o))
@@ -1259,7 +1239,7 @@ index 05e8d90..810c1ac 100644
  .phony_version_info:
  tensorflow/core/util/version_info.cc: .phony_version_info
  	tensorflow/tools/git/gen_git_source.sh \$@
-@@ -732,6 +855,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
+@@ -732,6 +894,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
  	-o \$(BENCHMARK_NAME) \$(BENCHMARK_OBJS) \\
  	\$(LIBFLAGS) \$(TEGRA_LIBS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS) \$(CUDA_LIBS)
  
@@ -1313,6 +1293,58 @@ index 7ff360e..f8c9c69 100644
  }
  
  thread::ThreadPool* NewThreadPoolFromSessionOptions(
+diff --git a/tensorflow/core/graph/mkl_layout_pass.cc b/tensorflow/core/graph/mkl_layout_pass.cc
+index 5368774..9927c1f 100644
+--- a/tensorflow/core/graph/mkl_layout_pass.cc
++++ b/tensorflow/core/graph/mkl_layout_pass.cc
+@@ -326,9 +326,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     rinfo_.push_back({csinfo_.concatv2,
+                       mkl_op_registry::GetMklOpName(csinfo_.concatv2),
+                       CopyAttrsConcatV2, AlwaysRewrite, nullptr});
+-    rinfo_.push_back({csinfo_.conv2d,
+-                      mkl_op_registry::GetMklOpName(csinfo_.conv2d),
+-                      CopyAttrsConv2D, AlwaysRewrite, nullptr});
++    //rinfo_.push_back({csinfo_.conv2d,
++    //                  mkl_op_registry::GetMklOpName(csinfo_.conv2d),
++    //                  CopyAttrsConv2D, AlwaysRewrite, nullptr});
+     rinfo_.push_back({csinfo_.conv2d_grad_filter,
+                       mkl_op_registry::GetMklOpName(csinfo_.conv2d_grad_filter),
+                       CopyAttrsConv2D, AlwaysRewrite, nullptr});
+@@ -380,8 +380,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     wsinfo_.push_back({csinfo_.max_pool, csinfo_.max_pool_grad, 0, 1, 1, 3});
+ 
+     // Add a rule for merging nodes
+-    minfo_.push_back({csinfo_.mkl_conv2d, csinfo_.bias_add, 0,
+-                      csinfo_.mkl_conv2d_with_bias});
++    //minfo_.push_back({csinfo_.mkl_conv2d, csinfo_.bias_add, 0,
++    //                  csinfo_.mkl_conv2d_with_bias});
+ 
+     biasaddgrad_matmul_context_ = {csinfo_.bias_add_grad, csinfo_.matmul,
+                                    IsBiasAddGradInMatMulContext};
+@@ -2467,9 +2467,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     rinfo_.push_back({csinfo_.concatv2,
+                       mkl_op_registry::GetMklOpName(csinfo_.concatv2),
+                       CopyAttrsConcatV2, AlwaysRewrite});
+-    rinfo_.push_back({csinfo_.conv2d,
+-                      mkl_op_registry::GetMklOpName(csinfo_.conv2d),
+-                      CopyAttrsConv2D, AlwaysRewrite});
++    //rinfo_.push_back({csinfo_.conv2d,
++    //                  mkl_op_registry::GetMklOpName(csinfo_.conv2d),
++    //                  CopyAttrsConv2D, AlwaysRewrite});
+     rinfo_.push_back({csinfo_.conv2d_with_bias, csinfo_.mkl_conv2d_with_bias,
+                       CopyAttrsConv2D, AlwaysRewrite});
+     rinfo_.push_back({csinfo_.conv2d_grad_filter,
+@@ -2541,8 +2541,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     wsinfo_.push_back({csinfo_.max_pool, csinfo_.max_pool_grad, 0, 1, 1, 3});
+ 
+     // Add a rule for merging nodes
+-    minfo_.push_back({csinfo_.conv2d, csinfo_.bias_add,
+-                      csinfo_.conv2d_with_bias, GetConv2DOrBiasAdd});
++    //minfo_.push_back({csinfo_.conv2d, csinfo_.bias_add,
++    //                  csinfo_.conv2d_with_bias, GetConv2DOrBiasAdd});
+ 
+     minfo_.push_back({csinfo_.conv2d_grad_filter, csinfo_.bias_add_grad,
+                       csinfo_.conv2d_grad_filter_with_bias,
 diff --git a/tensorflow/core/grappler/clusters/utils.cc b/tensorflow/core/grappler/clusters/utils.cc
 index 50d6e64..ec5698a 100644
 --- a/tensorflow/core/grappler/clusters/utils.cc
@@ -1415,6 +1447,12 @@ EOD
     fi
 
     # Build tensorflow core.
+    bazel build //tensorflow/cc:cc_ops
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to generate Tensorflow cc ops files!${NC}"
+        return 1
+    fi
     make -j$(nproc) -f tensorflow/contrib/makefile/Makefile
     rc=$?
     if [ $rc != 0 ]; then
@@ -1424,7 +1462,9 @@ EOD
     sudo mkdir -p $prefix/lib &&
     sudo install tensorflow/contrib/makefile/gen/lib/libtensorflow-core.a $prefix/lib &&
     sudo mkdir -p $prefix/include &&
+    install_headers tensorflow/cc $prefix/include &&
     install_headers tensorflow/core/framework $prefix/include &&
+    install_headers tensorflow/core/graph $prefix/include &&
     install_headers tensorflow/core/lib $prefix/include &&
     install_headers tensorflow/core/platform $prefix/include &&
     install_headers tensorflow/core/public $prefix/include &&
@@ -1432,7 +1472,9 @@ EOD
     install_headers tensorflow/core/framework $prefix/include &&
     install_headers tensorflow/core/lib $prefix/include &&
     install_headers tensorflow/core/protobuf $prefix/include &&
-    cd ../../../../.. &&
+    cd ../../../../../bazel-genfiles &&
+    install_headers tensorflow/cc $prefix/include &&
+    cd .. &&
     sudo mkdir -p $prefix/include/third_party &&
     sudo cp -a third_party/eigen3 $prefix/include/third_party &&
     sudo mkdir -p $prefix/bin &&
@@ -1713,6 +1755,7 @@ install_gemmlowp &&
 install_nsync &&
 install_farmhash &&
 install_neon2sse &&
+install_bazel &&
 install_tensorflow &&
 install_x264 &&
 install_ffmpeg &&

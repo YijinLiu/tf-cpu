@@ -1,3 +1,5 @@
+// NOTE: This one is just experimental. It doesn't really work. Use obj_detect.cc instead.
+
 #include <math.h>
 #include <stdio.h>
 
@@ -329,8 +331,14 @@ class ObjDetector {
             }
             VLOG(3) << "detection " << d << ": best_cls=" << best_cls << " best_score="
                 << best_score;
+            // This score cutoff is taken from Tensorflow's demo app.
+            // There are quite a lot of nodes to be run to convert it to the useful possibility
+            // scores. As a result of that, this cutoff will cause it to lose good detections in
+            // some scenarios and generate too much noise in other scenario.
             if (best_score < .001f) continue;
             output_classes += num_classes;
+            // The output location is coded using some priors from the graph.
+            // TODO: Extract the priors and use that to convert the coordinates to geo boxes.
             const int ymin = output_locations[0] * mat.rows;
             const int xmin = output_locations[1] * mat.cols;
             const int ymax = output_locations[2] * mat.rows;

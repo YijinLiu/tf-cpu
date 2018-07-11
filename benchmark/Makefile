@@ -134,7 +134,7 @@ train_mnist: $(BIN)/mnist \
              $(TESTDATA)/mnist_data/train-labels-idx1-ubyte \
              $(TESTDATA)/mnist_data/t10k-images-idx3-ubyte \
              $(TESTDATA)/mnist_data/t10k-labels-idx1-ubyte
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/mnist -logtostderr -data_dir=$(TESTDATA)/mnist_data
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/mnist -data_dir=$(TESTDATA)/mnist_data
 
 PREFIX?=/usr/local
 BLAS?=MKL
@@ -180,7 +180,8 @@ $(BIN)/classify.o: $(SRC)/classify.cc $(SRC)/test_video.hpp $(SRC)/utils.hpp
 $(BIN)/classify: $(BIN)/test_video.o $(BIN)/classify.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	    -Wl,--no-whole-archive -lprotobuf -lnsync -ldouble-conversion \
+        $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/obj_detect_lite.o: $(SRC)/obj_detect_lite.cc $(SRC)/test_video.hpp \
                           $(SRC)/video_encoder.hpp $(SRC)/utils.hpp
@@ -201,19 +202,22 @@ $(BIN)/obj_detect.o: obj_detect.cc test_video.hpp video_encoder.hpp utils.hpp
 $(BIN)/obj_detect: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync $(OPENCV_LDFLAGS) \
+	    -Wl,--no-whole-archive -lprotobuf -lnsync -ldouble-conversion $(OPENCV_LDFLAGS) \
 	    $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
+	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $(BLAS_CXXFLAGS/$(BLAS)) $< -o $@
 
 $(BIN)/mnist.o: $(SRC)/mnist.cc $(SRC)/simple_network.hpp
+	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $(BLAS_CXXFLAGS/$(BLAS)) $< -o $@
 
 $(BIN)/mnist: $(BIN)/mnist.o $(BIN)/simple_network.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	    -Wl,--no-whole-archive -lprotobuf -lnsync -ldouble-conversion \
+        $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(TESTDATA)/mobilenet_v1_%.tflite: $(PROJECT_ROOT)/models/mobilenet/v1/mobilenet_v1_%.tgz
 	cd $(TESTDATA) ; tar xf $< ./mobilenet_v1_$*.tflite ; touch $@

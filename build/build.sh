@@ -119,8 +119,8 @@ install_openblas() {
 # Visit https://registrationcenter.intel.com/en/products/postregistration/?sn=3VGW-6NPJL6SB
 # to find latest versions of MKL and IPP.
 install_mkl() {
-    prid="12725"
-    ver="2018.2.199"
+    prid="13005"
+    ver="2018.3.222"
     if [ ! -d "l_mkl_${ver}" ]; then
         if [ ! -f "l_mkl_${ver}.tgz" ]; then
             wget http://registrationcenter-download.intel.com/akdlm/irc_nas/tec/${prid}/l_mkl_${ver}.tgz
@@ -168,7 +168,7 @@ install_mkldnn() {
         return
     fi
     if [ ! -d "mkl-dnn" ] ; then
-        git clone --depth=1 https://github.com/intel/mkl-dnn -b v0.14
+        git clone --depth=1 https://github.com/intel/mkl-dnn -b v$mkldnn_version
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download mkl-dnn source code!${NC}"
@@ -399,7 +399,7 @@ index faabc5d..4b3fa88 100644
      elseif("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
          if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
 -            set(DEF_ARCH_OPT_FLAGS "-march=native -mtune=native")
-+            set(DEF_ARCH_OPT_FLAGS "${mopts}")
++            set(DEF_ARCH_OPT_FLAGS "$mopts")
          endif()
          if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
              # suppress warning on assumptions made regarding overflow (#146)
@@ -498,17 +498,20 @@ install_blas() {
 }
 
 install_eigen() {
-    if [ ! -d "eigen" ]; then
-        # Tensorflow needs some latest changes.
-        # TODO: Switch to release after there is a new one.
-        git clone --depth=1 https://github.com/eigenteam/eigen-git-mirror eigen
+    # Tensorflow needs some latest changes.
+    # TODO: Switch to release after there is a new one.
+    # See tensorflow/workspace.bzl for what's the version used by tensorflow.
+    eigen_tag=fd6845384b86
+    if [ ! -d "eigen-eigen-$eigen_tag" ]; then
+        wget -O eigen-${eigen_tag}.tar.gz https://bitbucket.org/eigen/eigen/get/${eigen_tag}.tar.gz &&
+        tar xvf eigen-${eigen_tag}.tar.gz
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download eigen!${NC}"
             return 1
         fi
     fi
-    cd eigen
+    cd eigen-eigen-${eigen_tag}
     mkdir build
     cd build
     cmake -DCMAKE_INSTALL_PREFIX=$prefix .. && sudo make install
@@ -669,6 +672,28 @@ install_farmhash() {
     cd ..
 }
 
+install_double_conversion() {
+    if [ ! -d "double-conversion" ] ; then
+        git clone --depth=1 https://github.com/google/double-conversion
+        rc=$?
+        if [ $rc != 0 ]; then
+            echo -e "${RED}Failed to download double-conversion.${NC}"
+            return 1
+        fi
+    fi
+    cd double-conversion
+    mkdir -p build
+    cd build
+    cmake -DCMAKE_INSTALL_PREFIX=$prefix .. &&
+    make -j$(nproc) && sudo make install
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to build flatbuffers${NC}"
+        return 1
+    fi
+    cd ../..
+}
+
 install_neon2sse() {
     if [ ! -d "ARM_NEON_2_x86_SSE" ] ; then
         git clone --depth=1 https://github.com/intel/ARM_NEON_2_x86_SSE ARM_NEON_2_x86_SSE
@@ -725,90 +750,50 @@ install_tensorflow() {
         fi
         cd tensorflow
         patch -l -p1 <<- EOD
+diff --git a/tensorflow/cc/gradients/math_grad.cc b/tensorflow/cc/gradients/math_grad.cc
+index 52c1772..c23ce25 100644
+--- a/tensorflow/cc/gradients/math_grad.cc
++++ b/tensorflow/cc/gradients/math_grad.cc
+@@ -264,6 +264,16 @@ Status SigmoidGrad(const Scope& scope, const Operation& op,
+ }
+ REGISTER_GRADIENT_OP("Sigmoid", SigmoidGrad);
+ 
++Status SigmoidWithCrossEntropyLossGrad(const Scope& scope,
++                                       const Operation& op,
++                                       const std::vector<Output>& grad_inputs,
++                                       std::vector<Output>* grad_outputs) {
++  grad_outputs->push_back(SimpleLossGrad(scope, op.output(1), op.input(1)));
++  grad_outputs->push_back(Identity(scope, grad_inputs[0]));
++  return scope.status();
++}
++REGISTER_GRADIENT_OP("SigmoidWithCrossEntropyLoss", SigmoidWithCrossEntropyLossGrad);
++
+ Status SignGrad(const Scope& scope, const Operation& op,
+                 const std::vector<Output>& grad_inputs,
+                 std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/cc/gradients/nn_grad.cc b/tensorflow/cc/gradients/nn_grad.cc
-index 0cb3132..7346c91 100644
+index 0cb3132..ca7f920 100644
 --- a/tensorflow/cc/gradients/nn_grad.cc
 +++ b/tensorflow/cc/gradients/nn_grad.cc
-@@ -59,6 +59,77 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
+@@ -59,6 +59,16 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
  }
  REGISTER_GRADIENT_OP("LogSoftmax", LogSoftmaxGrad);
  
-+bool _isZero(const Scope& scope, Output grad){
-+  std::array<std::string, 2> zeroOpTypeNames {{"ZerosLike", "Zeros"}};
-+  string opTypeName = grad.op().node()->type_string();
-+  for(auto& zeroOpTypeName : zeroOpTypeNames){
-+    if(opTypeName == zeroOpTypeName){
-+      return true;
-+    }
-+  }
-+  //the Operation we were provided is not named something obvious
-+  //we need to actually look at its contents.
-+  //the original python code did this by calling a utility function called
-+  //tensor_util.constant_value. When you dig into tensor_tuil.constant_value
-+  //it is a large number of 'if' statements that measure certain edge cases
-+  //where it is possible to get the value of the tensor without actually
-+  //evaluating it. There are many kinds of tensors that can not have this
-+  //done.
-+  //There is no C++ equivalent to tensor_util.constant_value so we do nothing
-+  //for the moment.
-+  return false;
-+}
-+
-+Output _BroadcastMul(const Scope& scope, Output vec, Output mat){
-+  /* Multiply after broadcasting vec to match dimensions of mat.
-+     Args:
-+       vec: A 1-D tensor of dimension [D0]
-+       mat: A 2-D tensor of dimesnion [D0, D1]
-+    Returns:
-+      A tensor of dimension [D0, D1], the result fo vec * mat
-+      we use an element for element multiply here.
-+  */
-+  auto reshaped = ExpandDims(scope, vec, -1);
-+  return Multiply(scope, reshaped, mat);
-+}
-+
-+Status SoftmaxCrossEntropyWithLogitsGrad(const Scope& scope,
-+                                         const Operation& op,
-+                                         const std::vector<Output>& grad_inputs,
-+                                         std::vector<Output>* grad_outputs) {
-+  // Softmax gradient with cross entropy logits function
-+  // We multiply the backprop for cost with the gradients - op.output[1]
-+  // There is no gradient for labels
-+  auto logits = op.input(0); //the things generated by the network are at
-+                             //input index 0. The "truth" labels are at index 1.
-+  auto softmax_grad = op.output(1);
-+
-+  //The documentation for ops::SoftmaxCrossEntropyWithLogits says
-+  //loss is the output at index 0, and backprop is the output at index 1
-+  auto grad_loss = grad_inputs[0];
-+  auto grad_grad = grad_inputs[1];
-+
-+  auto grad = _BroadcastMul(scope, grad_loss, softmax_grad);
-+  if(!_isZero(scope, grad_grad)){
-+    std::vector<int> axis;
-+    auto logitsSoftmax = Softmax(scope, logits);
-+
-+    auto grad_gradExpand = ExpandDims(scope, grad_grad, 1);
-+    auto logitsSoftMaxExpand = ExpandDims(scope, logitsSoftmax, 2);
-+    auto matMulResult = BatchMatMul(scope, grad_gradExpand, logitsSoftMaxExpand);
-+    axis.push_back(1);
-+    auto squeezeResult = Squeeze(scope, matMulResult, Squeeze::Axis(axis));
-+    auto subtractionResult = Subtract(scope, grad_grad, squeezeResult);
-+    auto multiplyResult = Multiply(scope, subtractionResult, logitsSoftmax);
-+    grad = Add(scope, grad, multiplyResult);
-+  }
-+  auto minusLogSoftmax = Multiply(scope, LogSoftmax(scope, logits), -1.0f);
-+  grad_outputs->push_back(grad);
-+  grad_outputs->push_back(_BroadcastMul(scope, grad_loss, minusLogSoftmax));
++Status SoftmaxWithLogLikelihoodLossGrad(const Scope& scope,
++                                        const Operation& op,
++                                        const std::vector<Output>& grad_inputs,
++                                        std::vector<Output>* grad_outputs) {
++  grad_outputs->push_back(SimpleLossGrad(scope, op.output(1), op.input(1)));
++  grad_outputs->push_back(Identity(scope, grad_inputs[0]));
 +  return scope.status();
 +}
-+REGISTER_GRADIENT_OP("SoftmaxCrossEntropyWithLogits", SoftmaxCrossEntropyWithLogitsGrad);
++REGISTER_GRADIENT_OP("SoftmaxWithLogLikelihoodLoss", SoftmaxWithLogLikelihoodLossGrad);
 +
  Status ReluGradHelper(const Scope& scope, const Operation& op,
                        const std::vector<Output>& grad_inputs,
                        std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/contrib/lite/Makefile b/tensorflow/contrib/lite/Makefile
-index b4504f2..1bebd39 100644
+index b4504f2..2701b9e 100644
 --- a/tensorflow/contrib/lite/Makefile
 +++ b/tensorflow/contrib/lite/Makefile
 @@ -1,3 +1,4 @@
@@ -821,10 +806,10 @@ index b4504f2..1bebd39 100644
  # Settings for the host compiler.
  CXX := \$(CC_PREFIX)gcc
 -CXXFLAGS := --std=c++11 -O3 -DNDEBUG
-+CXXFLAGS := --std=c++11 -O3 -DNDEBUG ${mopts} -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
++CXXFLAGS := --std=c++11 -O3 -DNDEBUG $mopts -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
  CC := \$(CC_PREFIX)gcc
 -CFLAGS := -O3 -DNDEBUG
-+CFLAGS := -O3 -DNDEBUG ${mopts}
++CFLAGS := -O3 -DNDEBUG $mopts
  LDOPTS :=
  LDOPTS += -L/usr/local/lib
  ARFLAGS := -r
@@ -848,7 +833,7 @@ index b4504f2..1bebd39 100644
 --lpthread \\
 --lm \\
 --lz
-+INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I${prefix}/include -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I$prefix/include -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
 +
 +LIBS := -lfarmhash -lstdc++ -lpthread -lm -lz
  
@@ -916,7 +901,7 @@ index 85aca36..d4754b9 100644
  
  // nn api types
 diff --git a/tensorflow/contrib/makefile/Makefile b/tensorflow/contrib/makefile/Makefile
-index 05e8d90..7d6270e 100644
+index 05e8d90..a3a236c 100644
 --- a/tensorflow/contrib/makefile/Makefile
 +++ b/tensorflow/contrib/makefile/Makefile
 @@ -81,15 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
@@ -932,7 +917,7 @@ index 05e8d90..7d6270e 100644
 --I\$(MAKEFILE_DIR)/downloads/nsync/public \\
 --I\$(MAKEFILE_DIR)/downloads/fft2d \\
 --I\$(HOST_GENDIR)
-+HOST_INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../.. -I\$(HOST_GENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++HOST_INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../.. -I\$(HOST_GENDIR) -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	HOST_INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
@@ -958,11 +943,11 @@ index 05e8d90..7d6270e 100644
 +BLAS?=MKL
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
-+BLAS_CXX_FLAGS/MKL:=${mkl_cxxflags}
-+BLAS_LD_FLAGS/ATLAS:=-L${prefix}/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
-+BLAS_LD_FLAGS/OpenBLAS:=-L${prefix}/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
++BLAS_CXX_FLAGS/MKL:=$mkl_cxxflags
++BLAS_LD_FLAGS/ATLAS:=-L$prefix/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
++BLAS_LD_FLAGS/OpenBLAS:=-L$prefix/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
 +# See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
-+BLAS_LD_FLAGS/MKL:=${mkl_ldflags}
++BLAS_LD_FLAGS/MKL:=$mkl_ldflags
 +
  # Settings for the target compiler.
  CXX := \$(CC_PREFIX) gcc
@@ -971,14 +956,14 @@ index 05e8d90..7d6270e 100644
  
  ifneq (\$(TARGET),ANDROID)
 -  OPTFLAGS += -march=native
-+   OPTFLAGS += ${mopts}
++   OPTFLAGS += $mopts
  endif
  
 -CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG \$(OPTFLAGS)
 -LDFLAGS := \\
 --L/usr/local/lib
 +CXXFLAGS := --std=c++11 -g1 -DIS_SLIM_BUILD -DNDEBUG \$(OPTFLAGS)
-+LDFLAGS := -L${prefix}/lib
++LDFLAGS := -L$prefix/lib
  DEPFLAGS = -MT \$@ -MMD -MP -MF \$(DEPDIR)/\$*.Td
  
 -INCLUDES := \\
@@ -990,7 +975,7 @@ index 05e8d90..7d6270e 100644
 --I\$(MAKEFILE_DIR)/downloads/fft2d \\
 --I\$(PROTOGENDIR) \\
 --I\$(PBTGENDIR)
-+INCLUDES := -I. -I\$(PROTOGENDIR) -Ibazel-genfiles -I\$(PBTGENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++INCLUDES := -I. -I\$(PROTOGENDIR) -Ibazel-genfiles -I\$(PBTGENDIR) -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
@@ -1391,6 +1376,70 @@ index f318e39..586cdc8 100644
        return GetLocalCPUInfo();
      }
    }
+diff --git a/tensorflow/core/kernels/cwise_op_sigmoid.cc b/tensorflow/core/kernels/cwise_op_sigmoid.cc
+index c132fdb..c07ef05 100644
+--- a/tensorflow/core/kernels/cwise_op_sigmoid.cc
++++ b/tensorflow/core/kernels/cwise_op_sigmoid.cc
+@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
+ limitations under the License.
+ ==============================================================================*/
+ 
++#include "tensorflow/core/framework/register_types.h"
+ #include "tensorflow/core/kernels/cwise_ops_common.h"
+ #include "tensorflow/core/kernels/cwise_ops_gradients.h"
+ 
+@@ -37,4 +38,51 @@ REGISTER3(SimpleBinaryOp, GPU, "SigmoidGrad", functor::sigmoid_grad, float,
+ REGISTER(SimpleBinaryOp, SYCL, "SigmoidGrad", functor::sigmoid_grad, float);
+ #endif  // TENSORFLOW_USE_SYCL
+ 
++template <typename Device, typename T>
++class SigmoidWithCrossEntropyLossOp : public OpKernel {
++ public:
++  explicit SigmoidWithCrossEntropyLossOp(OpKernelConstruction* context)
++      : OpKernel(context) {}
++
++  void Compute(OpKernelContext* context) override {
++    const Tensor& logits_in = context->input(0);
++    const TensorShape shape_in = logits_in.shape();
++    OP_REQUIRES(context, TensorShapeUtils::IsMatrix(shape_in),
++                errors::InvalidArgument("logits must be 2-dimensional"));
++    Tensor* loss_out = nullptr;
++    OP_REQUIRES_OK(context, context->allocate_output(
++            0, TensorShape({shape_in.dim_size(0)}), &loss_out));
++    Tensor* sigmoid_out = nullptr;
++    OP_REQUIRES_OK(context, context->forward_input_or_allocate_output(
++            {0}, 1, shape_in, &sigmoid_out));
++    if (logits_in.NumElements() > 0) {
++      functor::UnaryFunctor<Device, functor::sigmoid<T>> sigmoid_functor;
++      sigmoid_functor(context->eigen_device<Device>(), sigmoid_out->flat<T>(),
++                      logits_in.flat<T>());
++      const auto sigmoid = sigmoid_out->matrix<T>();
++      const auto labels = context->input(1).flat<int>();
++      auto loss = loss_out->vec<T>();
++      for (int i = 0; i < sigmoid_out->dim_size(0); i++) {
++        float xent = 0.f;
++        for (int j = 0; j < sigmoid_out->dim_size(1); j++) {
++          if (j == labels(i)) {
++            xent -= ::logf(sigmoid(i, j));
++          } else {
++            xent -= ::logf(1 - sigmoid(i, j));
++          }
++        }
++        loss(i) == xent;
++      }
++    }
++  }
++};
++
++#undef REGISTER_CPU
++#define REGISTER_CPU(T)                                          \\
++  REGISTER_KERNEL_BUILDER(                                       \\
++      Name("SigmoidWithCrossEntropyLoss").Device(DEVICE_CPU).TypeConstraint<T>("T"), \\
++      SigmoidWithCrossEntropyLossOp<CPUDevice, T>);
++TF_CALL_float(REGISTER_CPU);
++TF_CALL_double(REGISTER_CPU);
++
+ }  // namespace tensorflow
 diff --git a/tensorflow/core/kernels/neon/depthwiseconv_float.h b/tensorflow/core/kernels/neon/depthwiseconv_float.h
 index 11f5be7..fbc13c8 100644
 --- a/tensorflow/core/kernels/neon/depthwiseconv_float.h
@@ -1419,6 +1468,200 @@ index 11f5be7..fbc13c8 100644
  namespace tensorflow {
  namespace neon {
  
+diff --git a/tensorflow/core/kernels/softmax_op.cc b/tensorflow/core/kernels/softmax_op.cc
+index e726089..c350757 100644
+--- a/tensorflow/core/kernels/softmax_op.cc
++++ b/tensorflow/core/kernels/softmax_op.cc
+@@ -15,6 +15,8 @@ limitations under the License.
+ 
+ // See docs in ../ops/nn_ops.cc.
+ 
++#include <math.h>
++
+ #include "tensorflow/core/lib/strings/str_util.h"
+ #define EIGEN_USE_THREADS
+ 
+@@ -23,6 +25,7 @@ limitations under the License.
+ #include "tensorflow/core/framework/register_types.h"
+ #include "tensorflow/core/framework/tensor.h"
+ #include "tensorflow/core/framework/tensor_shape.h"
++#include "tensorflow/core/kernels/cwise_ops.h"
+ #include "tensorflow/core/kernels/softmax_op_functor.h"
+ 
+ namespace tensorflow {
+@@ -102,4 +105,84 @@ REGISTER_KERNEL_BUILDER(
+     Name("Softmax").Device(DEVICE_SYCL).TypeConstraint<double>("T"),
+     SoftmaxOp<SYCLDevice, double>);
+ #endif  // TENSORFLOW_USE_SYCL
++
++template <typename Device, typename T>
++class SimpleLossGradOp : public OpKernel {
++ public:
++  explicit SimpleLossGradOp(OpKernelConstruction* context) : OpKernel(context) {}
++
++  void Compute(OpKernelContext* context) override {
++    const Tensor& output_in = context->input(0);
++    const TensorShape shape_in = output_in.shape();
++    OP_REQUIRES(context, TensorShapeUtils::IsMatrix(shape_in),
++                errors::InvalidArgument("output must be 2-dimensional"));
++    Tensor* grad_out = nullptr;
++    OP_REQUIRES_OK(context, context->forward_input_or_allocate_output(
++            {0}, 0, shape_in, &grad_out));
++    if (output_in.NumElements() > 0) {
++      const auto output = output_in.matrix<T>();
++      const auto labels = context->input(1).flat<int>();
++      auto grad = grad_out->matrix<T>();
++      for (int r = 0; r < output_in.dim_size(0); r++) {
++          for (int c = 0; c < output_in.dim_size(1); c++) {
++              if (labels(r) == c) {
++                  grad(r, c) = output(r, c) - 1.f;
++              } else {
++                  grad(r, c) = output(r, c);
++              }
++          }
++      }
++    }
++  }
++};
++
++#undef REGISTER_CPU
++#define REGISTER_CPU(T)                                          \\
++  REGISTER_KERNEL_BUILDER(                                       \\
++      Name("SimpleLossGrad").Device(DEVICE_CPU).TypeConstraint<T>("T"), \\
++      SimpleLossGradOp<CPUDevice, T>);
++TF_CALL_float(REGISTER_CPU);
++TF_CALL_double(REGISTER_CPU);
++#undef REGISTER_CPU
++
++template <typename Device, typename T>
++class SoftmaxWithLogLikelihoodLossOp : public OpKernel {
++ public:
++  explicit SoftmaxWithLogLikelihoodLossOp(OpKernelConstruction* context)
++      : OpKernel(context) {}
++
++  void Compute(OpKernelContext* context) override {
++    const Tensor& logits_in = context->input(0);
++    const TensorShape shape_in = logits_in.shape();
++    OP_REQUIRES(context, TensorShapeUtils::IsMatrix(shape_in),
++                errors::InvalidArgument("logits must be 2-dimensional"));
++    Tensor* loss_out = nullptr;
++    OP_REQUIRES_OK(context, context->allocate_output(
++            0, TensorShape({shape_in.dim_size(0)}), &loss_out));
++    Tensor* softmax_out = nullptr;
++    OP_REQUIRES_OK(context, context->forward_input_or_allocate_output(
++            {0}, 1, shape_in, &softmax_out));
++    if (logits_in.NumElements() > 0) {
++      functor::SoftmaxFunctor<Device, T> softmax_functor;
++      auto softmax = softmax_out->matrix<T>();
++      softmax_functor(context->eigen_device<Device>(), logits_in.matrix<T>(),
++                      softmax, false);
++      const auto labels = context->input(1).flat<int>();
++      auto loss = loss_out->vec<T>();
++      typename functor::log<T>::func log_functor;
++      for (int i = 0; i < loss.size(); i++) {
++          loss(i) = -log_functor(softmax(i, labels(i)));
++      }
++    }
++  }
++};
++
++#undef REGISTER_CPU
++#define REGISTER_CPU(T)                                          \\
++  REGISTER_KERNEL_BUILDER(                                       \\
++      Name("SoftmaxWithLogLikelihoodLoss").Device(DEVICE_CPU).TypeConstraint<T>("T"), \\
++      SoftmaxWithLogLikelihoodLossOp<CPUDevice, T>);
++TF_CALL_float(REGISTER_CPU);
++TF_CALL_double(REGISTER_CPU);
++
+ }  // namespace tensorflow
+diff --git a/tensorflow/core/ops/math_ops.cc b/tensorflow/core/ops/math_ops.cc
+index 8f8443a..304f9e6 100644
+--- a/tensorflow/core/ops/math_ops.cc
++++ b/tensorflow/core/ops/math_ops.cc
+@@ -243,6 +243,28 @@ REGISTER_OP("Atan").UNARY();
+ #undef UNARY_REAL
+ #undef UNARY_COMPLEX
+ 
++REGISTER_OP("SigmoidWithCrossEntropyLoss")
++    .Input("logits: T")
++    .Input("labels: int32")
++    .Output("loss: T")
++    .Output("sigmoid: T")
++    .Attr("T: {float, double}")
++    .SetShapeFn([](InferenceContext* c) {
++      ShapeHandle logits;
++      ShapeHandle labels;
++      if (c->WithRank(c->input(0), 2, &logits) == Status::OK() &&
++          c->WithRank(c->input(1), 1, &labels) == Status::OK()) {
++        DimensionHandle batch_size = c->Dim(logits, 0);
++        if (c->Value(batch_size) != c->Value(c->Dim(labels, 0))) {
++            return errors::InvalidArgument("Expect labels of batch size");
++        }
++        c->set_output(0, labels);
++        c->set_output(1, logits);
++        return Status::OK();
++      }
++      return errors::InvalidArgument("Expect logits of rank 2 and labels of rank 1");
++    });
++
+ REGISTER_OP("IsNan")
+     .Input("x: T")
+     .Output("y: bool")
+diff --git a/tensorflow/core/ops/nn_ops.cc b/tensorflow/core/ops/nn_ops.cc
+index 12d6dc5..c6f321e 100644
+--- a/tensorflow/core/ops/nn_ops.cc
++++ b/tensorflow/core/ops/nn_ops.cc
+@@ -1054,6 +1054,50 @@ REGISTER_OP("LogSoftmax")
+ 
+ // --------------------------------------------------------------------------
+ 
++REGISTER_OP("SimpleLossGrad")
++    .Input("output: T")
++    .Input("labels: int32")
++    .Output("grad: T")
++    .Attr("T: {float, double}")
++    .SetShapeFn([](InferenceContext* c) {
++      ShapeHandle output;
++      ShapeHandle labels;
++      if (c->WithRank(c->input(0), 2, &output) == Status::OK() &&
++          c->WithRank(c->input(1), 1, &labels) == Status::OK()) {
++        DimensionHandle batch_size = c->Dim(output, 0);
++        if (c->Value(batch_size) != c->Value(c->Dim(labels, 0))) {
++            return errors::InvalidArgument("Expect labels of batch size");
++        }
++        c->set_output(0, output);
++        return Status::OK();
++      }
++      return errors::InvalidArgument("Expect output of rank 2 and labels of rank 1");
++    });
++
++REGISTER_OP("SoftmaxWithLogLikelihoodLoss")
++    .Input("logits: T")
++    .Input("labels: int32")
++    .Output("loss: T")
++    .Output("softmax: T")
++    .Attr("T: {float, double}")
++    .SetShapeFn([](InferenceContext* c) {
++      ShapeHandle logits;
++      ShapeHandle labels;
++      if (c->WithRank(c->input(0), 2, &logits) == Status::OK() &&
++          c->WithRank(c->input(1), 1, &labels) == Status::OK()) {
++        DimensionHandle batch_size = c->Dim(logits, 0);
++        if (c->Value(batch_size) != c->Value(c->Dim(labels, 0))) {
++            return errors::InvalidArgument("Expect labels of batch size");
++        }
++        c->set_output(0, labels);
++        c->set_output(1, logits);
++        return Status::OK();
++      }
++      return errors::InvalidArgument("Expect logits of rank 2 and labels of rank 1");
++    });
++
++// --------------------------------------------------------------------------
++
+ REGISTER_OP("SoftmaxCrossEntropyWithLogits")
+     .Input("features: T")
+     .Input("labels: T")
 EOD
         rc=$?
         if [ $rc != 0 ]; then
@@ -1754,6 +1997,7 @@ install_flatbuffers &&
 install_gemmlowp &&
 install_nsync &&
 install_farmhash &&
+install_double_conversion &&
 install_neon2sse &&
 install_bazel &&
 install_tensorflow &&

@@ -13,7 +13,6 @@
 #include <vector>
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 
 #include "simple_network.hpp"
 
@@ -21,8 +20,8 @@ DEFINE_int32(neurons, 30, "");
 DEFINE_int32(epochs, 30, "");
 DEFINE_int32(mini_batch_size, 10, "");
 DEFINE_int32(num_samples_per_epoch, 60000, "");
-DEFINE_double(weight_decay, 0.9999, "");
-DEFINE_double(learning_rate, 0.5, "");
+DEFINE_double(weight_decay, 1.0, "");
+DEFINE_double(learning_rate, 0.01, "");
 DEFINE_string(data_dir, "", "");
 
 namespace {
@@ -69,7 +68,7 @@ std::vector<SimpleNetwork::Case> LoadMNISTData(std::string data_dir, const std::
     CHECK_EQ(3, image_dims.size()) << "Invalid image #dims: " << image_dims.size();
     const uint32_t num_images = image_dims[0];
     const uint32_t image_size = image_dims[1] * image_dims[2];
-    
+
     // Open labels file.
     const std::string labels_file = data_dir + "/" + name + "-labels-idx1-ubyte";
     FILE* labels_fh = CHECK_NOTNULL(fopen(labels_file.c_str(), "rb"));
@@ -104,7 +103,6 @@ std::vector<SimpleNetwork::Case> LoadMNISTData(std::string data_dir, const std::
 int main(int argc, char* argv[]) {
     google::SetCommandLineOption("v", "-1");
     google::ParseCommandLineFlags(&argc, &argv, true);
-    google::InitGoogleLogging(argv[0]);
     LOG(INFO) << "Loading MNIST data into memory ...";
     const auto training_data = LoadMNISTData(FLAGS_data_dir, "train");
     const auto testing_data = LoadMNISTData(FLAGS_data_dir, "t10k");
@@ -118,3 +116,36 @@ int main(int argc, char* argv[]) {
     network.Train(training_data, FLAGS_num_samples_per_epoch, FLAGS_epochs, FLAGS_weight_decay,
                   FLAGS_learning_rate, &testing_data);
 }
+
+/*
+2018-07-12 05:46:37.117916: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 1 testing accuracy: 0.9337(9337/10000).
+2018-07-12 05:46:37.693736: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 2 testing accuracy: 0.9458(9458/10000).
+2018-07-12 05:46:38.195392: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 3 testing accuracy: 0.9546(9546/10000).
+2018-07-12 05:46:38.704860: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 4 testing accuracy: 0.9572(9572/10000).
+2018-07-12 05:46:39.209291: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 5 testing accuracy: 0.9574(9574/10000).
+2018-07-12 05:46:39.726780: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 6 testing accuracy: 0.96(9600/10000).
+2018-07-12 05:46:40.230298: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 7 testing accuracy: 0.961(9610/10000).
+2018-07-12 05:46:40.735489: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 8 testing accuracy: 0.9646(9646/10000).
+2018-07-12 05:46:41.240680: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 9 testing accuracy: 0.9658(9658/10000).
+2018-07-12 05:46:41.780601: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 10 testing accuracy: 0.9654(9654/10000).
+2018-07-12 05:46:42.286129: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 11 testing accuracy: 0.966(9660/10000).
+2018-07-12 05:46:42.793442: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 12 testing accuracy: 0.9646(9646/10000).
+2018-07-12 05:46:43.299229: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 13 testing accuracy: 0.9671(9671/10000).
+2018-07-12 05:46:43.848350: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 14 testing accuracy: 0.965(9650/10000).
+2018-07-12 05:46:44.349775: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 15 testing accuracy: 0.9656(9656/10000).
+2018-07-12 05:46:44.853401: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 16 testing accuracy: 0.9667(9667/10000).
+2018-07-12 05:46:45.359143: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 17 testing accuracy: 0.9676(9676/10000).
+2018-07-12 05:46:45.878410: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 18 testing accuracy: 0.9665(9665/10000).
+2018-07-12 05:46:46.381842: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 19 testing accuracy: 0.9679(9679/10000).
+2018-07-12 05:46:46.887141: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 20 testing accuracy: 0.9644(9644/10000).
+2018-07-12 05:46:47.391725: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 21 testing accuracy: 0.964(9640/10000).
+2018-07-12 05:46:47.913578: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 22 testing accuracy: 0.9667(9667/10000).
+2018-07-12 05:46:48.430757: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 23 testing accuracy: 0.9649(9649/10000).
+2018-07-12 05:46:48.947995: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 24 testing accuracy: 0.9661(9661/10000).
+2018-07-12 05:46:49.462165: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 25 testing accuracy: 0.9654(9654/10000).
+2018-07-12 05:46:49.988273: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 26 testing accuracy: 0.9658(9658/10000).
+2018-07-12 05:46:50.490390: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 27 testing accuracy: 0.9653(9653/10000).
+2018-07-12 05:46:50.994772: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 28 testing accuracy: 0.9675(9675/10000).
+2018-07-12 05:46:51.497389: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 29 testing accuracy: 0.9667(9667/10000).
+2018-07-12 05:46:52.011331: I /home/chao/projects/tf-cpu/benchmark/simple_network.cc:210] Epoch 30 testing accuracy: 0.9657(9657/10000).
+*/

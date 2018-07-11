@@ -4,13 +4,13 @@
 
 #include "simple_network.hpp"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <iomanip>
 #include <limits>
 
-#include <glog/logging.h>
 #include <tensorflow/cc/framework/gradients.h>
 #include <tensorflow/core/graph/mkl_layout_pass.h>
 
@@ -83,24 +83,30 @@ void SimpleNetwork::Train(
     std::vector<tf::Output> params;
     tf::Output z;
     tf::Output a = tf::ops::StopGradient(scope_, inputs_);
+    tf::Output labels = tf::ops::StopGradient(scope_, labels_);
+    tf::Output loss;
     for (int i = 1; i < layers_.size(); i++) {
         const int rows = layers_[i-1].num_neurons;
         const int cols = layers_[i].num_neurons;
+        // Init weight.
         const std::string weight_name = LayerW(i);
         auto weight = tf::ops::Variable(scope_.WithOpName(weight_name), {rows, cols}, tf::DT_FLOAT);
         param_names.push_back(weight_name);
         params.push_back(weight);
-        inits.push_back(tf::ops::Assign(scope_, weight, tf::ops::ParameterizedTruncatedNormal(
-            scope_, {rows, cols}, 0.f, 2.f / (rows + cols), -10000.f, 10000.f)));
+        inits.push_back(tf::ops::Assign(scope_, weight, tf::ops::Div(
+            scope_, tf::ops::RandomNormal(scope_, {rows, cols}, tf::DT_FLOAT), ::sqrtf(rows))));
         CHECK(scope_.ok()) << scope_.status();
+        // Init bias.
         const std::string bias_name = LayerB(i);
         auto bias = tf::ops::Variable(scope_.WithOpName(bias_name), {cols}, tf::DT_FLOAT);
         param_names.push_back(bias_name);
         params.push_back(bias);
         inits.push_back(tf::ops::Assign(
-                scope_, bias, tf::ops::RandomNormal(scope_, {cols}, tf::DT_FLOAT)));
+            scope_, bias, tf::ops::RandomNormal(scope_, {cols}, tf::DT_FLOAT)));
+        // FC node.
         z = tf::ops::BiasAdd(
             scope_.WithOpName(LayerZ(i)), tf::ops::MatMul(scope_, a, weight), bias);
+        // Activation node.
         switch (layers_[i].activation) {
             case ActivationFunc::Identity:
                 a = z;
@@ -109,10 +115,24 @@ void SimpleNetwork::Train(
                 a = tf::ops::Relu(scope_.WithOpName(LayerA(i)), z);
                 break;
             case ActivationFunc::Sigmoid:
-                a = tf::ops::Sigmoid(scope_.WithOpName(LayerA(i)), z);
+                if (i == layers_.size() - 1) {
+                    auto output = tf::ops::SigmoidWithCrossEntropyLoss(
+                        scope_.WithOpName(LayerA(i)), z, labels);
+                    a = output.sigmoid;
+                    loss = output.loss;
+                } else {
+                    a = tf::ops::Sigmoid(scope_.WithOpName(LayerA(i)), z);
+                }
                 break;
             case ActivationFunc::SoftMax:
-                a = tf::ops::Softmax(scope_.WithOpName(LayerA(i)), z);
+                if (i == layers_.size() - 1) {
+                    auto output = tf::ops::SoftmaxWithLogLikelihoodLoss(
+                        scope_.WithOpName(LayerA(i)), z, labels);
+                    a = output.softmax;
+                    loss = output.loss;
+                } else {
+                    a = tf::ops::Softmax(scope_.WithOpName(LayerA(i)), z);
+                }
                 break;
             default:
                 LOG(FATAL)
@@ -127,21 +147,6 @@ void SimpleNetwork::Train(
     std::vector<tf::Output> objectives;
     objectives.push_back(corrects_);
 
-    // Loss node.
-    tf::Input expanded_labels = tf::ops::StopGradient(
-        scope_, tf::ops::OneHot(scope_, labels_, output_classes_, 1.0f, 0.f));
-    tf::Output loss;
-    const int l = layers_.size() - 1;
-    switch (layers_[l].activation) {
-        case ActivationFunc::SoftMax:
-            loss = tf::ops::SoftmaxCrossEntropyWithLogits(
-                scope_.WithOpName(LOSS), z, expanded_labels).loss;
-            break;
-        default:
-            LOG(FATAL) << "Not supported output layer activation function: "
-                << static_cast<int>(layers_[l].activation);
-    }
-
     // Apply gradients.
     std::vector<tf::Output> param_grads;
     TF_CHECK_OK(tf::AddSymbolicGradients(scope_, {loss}, params, &param_grads));
@@ -154,7 +159,7 @@ void SimpleNetwork::Train(
             scope_.WithOpName(param_names[i] + GRAD_SUFFIX), params[i], learning_rate,
             param_grads[i]));
     }
-    
+
 #ifdef INTEL_MKL
     // TODO: This is not doing anything for now. Figure out why.
     std::unique_ptr<tf::Graph> graph(scope_.graph());
@@ -168,7 +173,7 @@ void SimpleNetwork::Train(
     std::vector<tf::Tensor> outputs;
     const auto status = session_.Run(inits, &outputs);
     CHECK(status.ok()) << status.ToString();
-    
+
     // Train.
     tf::Tensor batch_inputs(tf::DT_FLOAT, {mini_batch_size_, input_size_});
     float* raw_batch_inputs = batch_inputs.flat<float>().data();

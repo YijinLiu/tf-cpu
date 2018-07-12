@@ -475,4 +475,8 @@ beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 36399 ms(125 ms
 beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 40691 ms(140 mspf).
 beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 28642 ms(98 mspf).
 
+w/ MKL (_MklConv2D disabled)
+beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 36399 ms(125 mspf).
+beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 40691 ms(140 mspf).
+beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 28642 ms(98 mspf).
 */

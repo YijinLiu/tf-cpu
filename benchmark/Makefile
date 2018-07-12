@@ -129,6 +129,14 @@ run_obj_detect: $(BIN)/obj_detect \
 	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 
+run_face_detect: $(BIN)/obj_detect \
+                 $(TESTDATA)/frozen_inference_graph_face.pb \
+                 $(TESTDATA)/face_labels.txt
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	    --video_file=$(TESTDATA)/jurassic_world.mkv --output=jurassic_world.face.mkv \
+	    --model_file=$(TESTDATA)/frozen_inference_graph_face.pb \
+	    --labels_file=$(TESTDATA)/face_labels.txt
+
 train_mnist: $(BIN)/mnist \
              $(TESTDATA)/mnist_data/train-images-idx3-ubyte \
              $(TESTDATA)/mnist_data/train-labels-idx1-ubyte \
@@ -243,8 +251,14 @@ $(PROJECT_ROOT)/models/mobilenet/v2/mobilenet_v2_%.tgz:
 $(PROJECT_ROOT)/models/objdetect/%.tar.gz:
 	wget -P $(dir $@) http://download.tensorflow.org/models/object_detection/$*.tar.gz
 
+$(TESTDATA)/frozen_inference_graph_face.pb:
+	wget -O $@ "https://github.com/yeephycho/tensorflow-face-detection/blob/master/model/frozen_inference_graph_face.pb?raw=true"
+
 $(TESTDATA)/mobilenet_labels.txt: $(PROJECT_ROOT)/models/mobilenet/labels.txt
 	cp $< $@
+
+$(TESTDATA)/face_labels.txt:
+	echo "face" > $@
 
 $(TESTDATA)/mnist_data/%: $(TESTDATA)/mnist_data/%.gz
 	gunzip -k $<
@@ -255,3 +269,6 @@ $(TESTDATA)/mnist_data/%.gz:
 
 clean:
 	rm -rf bin
+
+distclean: clean
+	rm -rf $(TESTDATA)/*.pb $(TESTDATA)/*.tflite

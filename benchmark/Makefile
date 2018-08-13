@@ -5,7 +5,7 @@ SRC:=$(PROJECT_ROOT)/benchmark
 BIN:=$(PROJECT_ROOT)/benchmark/bin
 TESTDATA:=$(PROJECT_ROOT)/benchmark/testdata
 
-all: run_classify_lite run_classify run_obj_detect
+all: run_classify_lite run_obj_detect_lite run_classify run_obj_detect
 
 run_classify_lite: $(BIN)/classify_lite \
                    $(TESTDATA)/mobilenet_v1_1.0_224_quant.tflite \
@@ -39,20 +39,20 @@ run_classify_lite: $(BIN)/classify_lite \
                    $(TESTDATA)/mobilenet_labels.txt
 	$(BIN)/classify_lite
 
-run_obj_detect_lite: $(BIN)/obj_detect_lite \
-                     $(TESTDATA)/mobilenet_ssd.tflite
+run_obj_detect_lite: $(BIN)/obj_detect_lite
+	@echo -e "\e[0;92m Running ssdlite_mobilenet_v2_coco10_lite ...\e[0m"
 	$(BIN)/obj_detect_lite \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v1_coco_lite.jpeg \
-	    --model_file=$(TESTDATA)/mobilenet_ssd.tflite \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssdlite_mobilenet_v2_coco10_lite.jpeg \
+	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.tflite \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
 	$(BIN)/obj_detect_lite \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v1_coco_lite.jpeg \
-	    --model_file=$(TESTDATA)/mobilenet_ssd.tflite \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssdlite_mobilenet_v2_coco10_lite.jpeg \
+	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.tflite \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
 	$(BIN)/obj_detect_lite \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v1_coco_lite.mkv \
-	    --model_file=$(TESTDATA)/mobilenet_ssd.tflite \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssdlite_mobilenet_v2_coco10_lite.mkv \
+	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.tflite \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
 
 TF_VLOG_LEVEL?=-1
 

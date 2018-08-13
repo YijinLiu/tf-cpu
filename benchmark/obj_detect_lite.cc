@@ -1,4 +1,6 @@
-// NOTE: This one is just experimental. It doesn't really work. Use obj_detect.cc instead.
+// Refer to
+// https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/lite/examples/android/app/src/main/java/org/tensorflow/demo/TFLiteObjectDetectionAPIModel.java
+// if it doesn't work.
 
 #include <math.h>
 #include <stdio.h>
@@ -22,6 +24,7 @@
 #include "video_encoder.hpp"
 
 DEFINE_string(model_file, "", "");
+DEFINE_bool(is_quantized_model, false, "");
 DEFINE_string(labels_file, "", "");
 
 DEFINE_string(video_file, "", "");
@@ -33,6 +36,9 @@ DEFINE_int32(batch_size, 1, "");
 DEFINE_int32(ffmpeg_log_level, 8, "");
 
 namespace {
+
+#define IMAGE_MEAN 128.0f
+#define IMAGE_STD 128.0f
 
 bool ReadLines(const std::string& file_name, std::vector<std::string>* lines) {
     std::ifstream file(file_name);
@@ -108,7 +114,8 @@ class ObjDetector {
   public:
     ObjDetector() {};
 
-    bool Init(const std::string& model_file, const std::vector<std::string>& labels) {
+    bool Init(const std::string& model_file, bool is_quantized,
+              const std::vector<std::string>& labels) {
         // Load model.
         model_ = tflite::FlatBufferModel::BuildFromFile(model_file.c_str());
         if (!model_) {
@@ -129,21 +136,33 @@ class ObjDetector {
         }
         interpreter_->SetNumThreads(1);
 
-        // Find input / output tensors.
-        input_tensor_ = interpreter_->tensor(interpreter_->inputs()[0]);
-        for (const int oti : interpreter_->outputs()) {
-            TfLiteTensor* tensor = interpreter_->tensor(oti);
-            VLOG(0) << tensor->name;
-            if (strcmp(tensor->name, "concat") == 0) {
-                output_locations_ = tensor;
-            } else if (strcmp(tensor->name, "concat_1") == 0) {
-                output_classes_ = tensor;
-            }
-        }
-        if (output_locations_ == nullptr || output_classes_ == nullptr) {
-            LOG(ERROR) << "Failed to find all output tensors!";
+        // Find input tensors.
+        if (interpreter_->inputs().size() != 1) {
+            LOG(ERROR) << "Graph needs to have 1 and only 1 input!";
             return false;
         }
+        input_tensor_ = interpreter_->tensor(interpreter_->inputs()[0]);
+        if (is_quantized) {
+            if (input_tensor_->type != kTfLiteUInt8) {
+                LOG(ERROR) << "Quantized graph's input should be kTfLiteUInt8!";
+                return false;
+            }
+        } else {
+            if (input_tensor_->type != kTfLiteFloat32) {
+                LOG(ERROR) << "Quantized graph's input should be kTfLiteFloat32!";
+                return false;
+            }
+        }
+
+        // Find output tensors.
+        if (interpreter_->outputs().size() != 4) {
+            LOG(ERROR) << "Graph needs to have 4 and only 4 outputs!";
+            return false;
+        }
+        output_locations_ = interpreter_->tensor(interpreter_->outputs()[0]);
+        output_classes_ = interpreter_->tensor(interpreter_->outputs()[1]);
+        output_scores_ = interpreter_->tensor(interpreter_->outputs()[2]);
+        num_detections_ = interpreter_->tensor(interpreter_->outputs()[3]);
 
         labels_ = labels;
         return true;
@@ -290,7 +309,7 @@ class ObjDetector {
                     for (int row = 0; row < height(); row++) {
                         const uchar* row_ptr = mat.ptr(row);
                         for (int i = 0; i < row_elems; i++) {
-                            dst[i] = row_ptr[i] / 128.f - 1.f;
+                            dst[i] = (row_ptr[i] - IMAGE_MEAN) / IMAGE_STD;
                         }
                         dst += row_elems;
                     }
@@ -312,44 +331,28 @@ class ObjDetector {
     }
 
     void AnnotateMat(cv::Mat& mat, int batch_index) {
-        const float* output_locations = TensorData<float>(output_locations_, batch_index);
-        const float* output_classes = TensorData<float>(output_classes_, batch_index);
-        const int num_detections = output_classes_->dims->data[1];
-        const int num_classes = output_classes_->dims->data[2];
+        const float* detection_locations = TensorData<float>(output_locations_, batch_index);
+        const float* detection_classes = TensorData<float>(output_classes_, batch_index);
+        const float* detection_scores = TensorData<float>(output_scores_, batch_index);
+        const int num_detections = *TensorData<float>(num_detections_, batch_index);
         for (int d = 0; d < num_detections; d++) {
-            // Find best class.
-            float best_score = FLT_MIN;
-            int best_cls = -1;
-            // Skip the first catch-all class.
-            for (int c = 1; c < num_classes; c++) {
-                const float score = expit(output_classes[c]);
-                VLOG(4) << "detection=" << d << " class=" << c << " score=" << score;
-                if (score > best_score) {
-                    best_score = score;
-                    best_cls = c;
-                }
+            const std::string cls = labels_[detection_classes[d]];
+            const float score = detection_scores[d];
+            const int ymin = detection_locations[4 * d] * mat.rows;
+            const int xmin = detection_locations[4 * d + 1] * mat.cols;
+            const int ymax = detection_locations[4 * d + 2] * mat.rows;
+            const int xmax = detection_locations[4 * d + 3] * mat.cols;
+            if (score < .3f) {
+                VLOG(3) << "Ignore detection " << d << " of '" << cls << "' with score " << score
+                    << " @[" << xmin << "," << ymin << ":" << xmax << "," << ymax << "]";
+            } else {
+                VLOG(0) << "Detected " << d << " of '" << cls << "' with score " << score
+                    << " @[" << xmin << "," << ymin << ":" << xmax << "," << ymax << "]";
+                cv::rectangle(mat, cv::Rect(xmin, ymin, xmax - xmin, ymax - ymin),
+                              cv::Scalar(0, 0, 255), 1);
+                cv::putText(mat, cls, cv::Point(xmin, ymin - 5),
+                            cv::FONT_HERSHEY_COMPLEX, .8, cv::Scalar(10, 255, 30));
             }
-            VLOG(3) << "detection " << d << ": best_cls=" << best_cls << " best_score="
-                << best_score;
-            // This score cutoff is taken from Tensorflow's demo app.
-            // There are quite a lot of nodes to be run to convert it to the useful possibility
-            // scores. As a result of that, this cutoff will cause it to lose good detections in
-            // some scenarios and generate too much noise in other scenario.
-            if (best_score < .001f) continue;
-            output_classes += num_classes;
-            // The output location is coded using some priors from the graph.
-            // TODO: Extract the priors and use that to convert the coordinates to geo boxes.
-            const int ymin = output_locations[0] * mat.rows;
-            const int xmin = output_locations[1] * mat.cols;
-            const int ymax = output_locations[2] * mat.rows;
-            const int xmax = output_locations[3] * mat.cols;
-            output_locations += 4;
-            VLOG(0) << "Detected " << labels_[best_cls - 1] << " with score " << best_score
-                << " @[" << xmin << "," << ymin << ":" << xmax << "," << ymax << "]";
-            cv::rectangle(mat, cv::Rect(xmin, ymin, xmax - xmin, ymax - ymin),
-                          cv::Scalar(0, 0, 255), 1);
-            cv::putText(mat, labels_[best_cls - 1], cv::Point(xmin, ymin - 5),
-                        cv::FONT_HERSHEY_COMPLEX, .8, cv::Scalar(10, 255, 30));
         }
     }
 
@@ -360,6 +363,8 @@ class ObjDetector {
     TfLiteTensor* input_tensor_ = nullptr;
     TfLiteTensor* output_locations_ = nullptr;
     TfLiteTensor* output_classes_ = nullptr;
+    TfLiteTensor* output_scores_ = nullptr;
+    TfLiteTensor* num_detections_ = nullptr;
 };
 
 }  // namespace
@@ -373,7 +378,7 @@ int main(int argc, char** argv) {
     std::vector<std::string> labels;
     if (!ReadLines(FLAGS_labels_file, &labels)) return 1;
     ObjDetector obj_detector;
-    if (!obj_detector.Init(FLAGS_model_file, labels)) return 1;
+    if (!obj_detector.Init(FLAGS_model_file, FLAGS_is_quantized_model, labels)) return 1;
     if (!FLAGS_video_file.empty()) {
         obj_detector.RunVideo(FLAGS_video_file, FLAGS_batch_size, FLAGS_output, FLAGS_output_video);
     } else if (!FLAGS_image_file.empty()) {

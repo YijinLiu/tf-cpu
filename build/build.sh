@@ -16,8 +16,8 @@ usage() {
 }
 
 blas=MKL
-version=1.8.0
-bazel_version=0.12.0
+version=1.10.0
+bazel_version=0.15.2
 prefix=/usr/local
 mopts="-march=native"
 mkldnn_version=
@@ -751,10 +751,10 @@ install_tensorflow() {
         cd tensorflow
         patch -l -p1 <<- EOD
 diff --git a/tensorflow/cc/gradients/math_grad.cc b/tensorflow/cc/gradients/math_grad.cc
-index 52c1772..c23ce25 100644
+index 35a01e0..851937e 100644
 --- a/tensorflow/cc/gradients/math_grad.cc
 +++ b/tensorflow/cc/gradients/math_grad.cc
-@@ -264,6 +264,16 @@ Status SigmoidGrad(const Scope& scope, const Operation& op,
+@@ -265,6 +265,16 @@ Status SigmoidGrad(const Scope& scope, const Operation& op,
  }
  REGISTER_GRADIENT_OP("Sigmoid", SigmoidGrad);
  
@@ -772,7 +772,7 @@ index 52c1772..c23ce25 100644
                  const std::vector<Output>& grad_inputs,
                  std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/cc/gradients/nn_grad.cc b/tensorflow/cc/gradients/nn_grad.cc
-index 0cb3132..ca7f920 100644
+index c73482d..871678a 100644
 --- a/tensorflow/cc/gradients/nn_grad.cc
 +++ b/tensorflow/cc/gradients/nn_grad.cc
 @@ -59,6 +59,16 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
@@ -793,24 +793,28 @@ index 0cb3132..ca7f920 100644
                        const std::vector<Output>& grad_inputs,
                        std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/contrib/lite/Makefile b/tensorflow/contrib/lite/Makefile
-index b4504f2..2701b9e 100644
+index df59547..f5f1aa0 100644
 --- a/tensorflow/contrib/lite/Makefile
 +++ b/tensorflow/contrib/lite/Makefile
-@@ -1,3 +1,4 @@
+@@ -1,3 +1,5 @@
 +SHELL := /bin/bash
- 
++
  # Find where we're running from, so we can store generated files here.
  ifeq (\$(origin MAKEFILE_DIR), undefined)
-@@ -28,32 +29,16 @@ GENDIR := \$(MAKEFILE_DIR)/gen/obj/
+ 	MAKEFILE_DIR := \$(shell dirname \$(realpath \$(lastword \$(MAKEFILE_LIST))))
+@@ -82,9 +84,9 @@ endif
  
  # Settings for the host compiler.
- CXX := \$(CC_PREFIX)gcc
--CXXFLAGS := --std=c++11 -O3 -DNDEBUG
-+CXXFLAGS := --std=c++11 -O3 -DNDEBUG $mopts -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
- CC := \$(CC_PREFIX)gcc
--CFLAGS := -O3 -DNDEBUG
-+CFLAGS := -O3 -DNDEBUG $mopts
- LDOPTS :=
+ CXX := \$(CC_PREFIX) \${TARGET_TOOLCHAIN_PREFIX}g++
+-CXXFLAGS += -O3 -DNDEBUG
++CXXFLAGS += -O3 -DNDEBUG ${mopts}
+ CCFLAGS := \${CXXFLAGS}
+-CXXFLAGS += --std=c++11
++CXXFLAGS += --std=c++11 -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
+ CC := \$(CC_PREFIX) \${TARGET_TOOLCHAIN_PREFIX}gcc
+ AR := \$(CC_PREFIX) \${TARGET_TOOLCHAIN_PREFIX}ar
+ CFLAGS :=
+@@ -92,25 +94,9 @@ LDOPTS :=
  LDOPTS += -L/usr/local/lib
  ARFLAGS := -r
  
@@ -828,66 +832,67 @@ index b4504f2..2701b9e 100644
 -# override local versions in the source tree.
 -INCLUDES += -I/usr/local/include
 -
--LIBS := \\
+-LIBS += \\
 --lstdc++ \\
 --lpthread \\
 --lm \\
 --lz
-+INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I$prefix/include -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
++INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I${prefix}/include -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
 +
 +LIBS := -lfarmhash -lstdc++ -lpthread -lm -lz
  
  # If we're on Linux, also link in the dl library.
  ifeq (\$(HOST_OS),LINUX)
-@@ -98,7 +83,8 @@ \$(wildcard tensorflow/contrib/lite/*test.cc) \\
+@@ -172,7 +158,8 @@ \$(wildcard tensorflow/contrib/lite/*test.cc) \\
  \$(wildcard tensorflow/contrib/lite/*/*test.cc) \\
  \$(wildcard tensorflow/contrib/lite/*/*/*test.cc) \\
  \$(wildcard tensorflow/contrib/lite/*/*/*/*test.cc) \\
 -\$(wildcard tensorflow/contrib/lite/kernels/test_util.cc) \\
 +tensorflow/contrib/lite/kernels/internal/spectrogram.cc \\
 +tensorflow/contrib/lite/kernels/test_util.cc \\
- \$(BENCHMARK_SRCS)
- # Filter out all the excluded files.
- TF_LITE_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
-@@ -118,7 +104,7 @@ \$(OBJDIR)%.o: %.c
+ \$(MINIMAL_SRCS)
+ ifeq (\$(BUILD_TYPE),micro)
+ CORE_CC_EXCLUDE_SRCS += \\
+@@ -209,7 +196,7 @@ \$(OBJDIR)%.o: %.c
  	\$(CC) \$(CCFLAGS) \$(INCLUDES) -c \$< -o \$@
  
  # The target that's compiled if there's no command-line arguments.
--all: \$(LIB_PATH) \$(BENCHMARK_PATH)
+-all: \$(LIB_PATH)  \$(MINIMAL_PATH) \$(BENCHMARK_BINARY)
 +all: \$(LIB_PATH)
  
- # Gathers together all the objects we've compiled into a single '.a' archive.
- \$(LIB_PATH): \$(LIB_OBJS)
+ # The target that's compiled for micro-controllers
+ micro: \$(LIB_PATH)
 diff --git a/tensorflow/contrib/lite/interpreter.cc b/tensorflow/contrib/lite/interpreter.cc
-index 4575fe8..4b8bcbc 100644
+index d103786..1f560da 100644
 --- a/tensorflow/contrib/lite/interpreter.cc
 +++ b/tensorflow/contrib/lite/interpreter.cc
-@@ -18,6 +18,7 @@ limitations under the License.
- #include <cstdarg>
+@@ -20,6 +20,8 @@ limitations under the License.
  #include <cstdint>
  #include <cstring>
+ 
 +#include <Eigen/Core>
++
  #include "tensorflow/contrib/lite/arena_planner.h"
  #include "tensorflow/contrib/lite/context.h"
- #include "tensorflow/contrib/lite/error_reporter.h"
+ #include "tensorflow/contrib/lite/context_util.h"
 diff --git a/tensorflow/contrib/lite/kernels/register.cc b/tensorflow/contrib/lite/kernels/register.cc
-index 0f98154..03f68ae 100644
+index 22a507e..c3dd680 100644
 --- a/tensorflow/contrib/lite/kernels/register.cc
 +++ b/tensorflow/contrib/lite/kernels/register.cc
-@@ -139,8 +139,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
+@@ -195,8 +195,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
    // TODO(andrewharp, ahentz): Move these somewhere more appropriate so that
    // custom ops aren't always included by default.
    AddCustom("Mfcc", tflite::ops::custom::Register_MFCC());
 -  AddCustom("AudioSpectrogram",
 -            tflite::ops::custom::Register_AUDIO_SPECTROGRAM());
+   AddCustom("TFLite_Detection_PostProcess",
+             tflite::ops::custom::Register_DETECTION_POSTPROCESS());
  }
- 
- TfLiteRegistration* BuiltinOpResolver::FindOp(
 diff --git a/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h b/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
-index 85aca36..d4754b9 100644
+index becd1f6..b8f3f8c 100644
 --- a/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
 +++ b/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
-@@ -58,8 +58,12 @@ inline void* loadFunction(const char* name) {
+@@ -61,8 +61,12 @@ inline void* loadFunction(const char* name) {
  }
  
  inline bool NNAPIExists() {
@@ -899,12 +904,12 @@ index 85aca36..d4754b9 100644
 +#endif
  }
  
- // nn api types
+ // NN api types based on NNAPI header file
 diff --git a/tensorflow/contrib/makefile/Makefile b/tensorflow/contrib/makefile/Makefile
-index 05e8d90..a3a236c 100644
+index 1a1ab54..11c598f 100644
 --- a/tensorflow/contrib/makefile/Makefile
 +++ b/tensorflow/contrib/makefile/Makefile
-@@ -81,15 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
+@@ -81,16 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  endif
  HOST_LDOPTS += -L/usr/local/lib
  
@@ -916,12 +921,13 @@ index 05e8d90..a3a236c 100644
 --I\$(MAKEFILE_DIR)/downloads/gemmlowp \\
 --I\$(MAKEFILE_DIR)/downloads/nsync/public \\
 --I\$(MAKEFILE_DIR)/downloads/fft2d \\
+--I\$(MAKEFILE_DIR)/downloads/double_conversion \\
 --I\$(HOST_GENDIR)
-+HOST_INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../.. -I\$(HOST_GENDIR) -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
++HOST_INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../.. -I\$(HOST_GENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	HOST_INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
-@@ -97,13 +89,7 @@ endif
+@@ -98,13 +89,7 @@ endif
  # override local versions in the source tree.
  HOST_INCLUDES += -I/usr/local/include
  
@@ -932,38 +938,39 @@ index 05e8d90..a3a236c 100644
 --lpthread \\
 --lm \\
 --lz
-+HOST_LIBS := -lnsync -lstdc++ -lprotobuf -lpthread -lm -lz
++HOST_LIBS := -lnsync_cpp -lnsync -ldouble-conversion -lstdc++ -lprotobuf -lpthread -lm -lz
  
  # If we're on Linux, also link in the dl library.
  ifeq (\$(HOST_OS),LINUX)
-@@ -151,28 +137,28 @@ PROTOGENDIR := \$(GENDIR)proto/
+@@ -153,30 +138,29 @@ PBTGENDIR := \$(GENDIR)proto_text/
+ PROTOGENDIR := \$(GENDIR)proto/
  DEPDIR := \$(GENDIR)dep/
  \$(shell mkdir -p \$(DEPDIR) >/dev/null)
- 
++ 
 +BLAS?=MKL
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
-+BLAS_CXX_FLAGS/MKL:=$mkl_cxxflags
-+BLAS_LD_FLAGS/ATLAS:=-L$prefix/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
-+BLAS_LD_FLAGS/OpenBLAS:=-L$prefix/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
++BLAS_CXX_FLAGS/MKL:=${mkl_cxxflags}
++BLAS_LD_FLAGS/ATLAS:=-L${prefix}/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
++BLAS_LD_FLAGS/OpenBLAS:=-L${prefix}/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
 +# See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
-+BLAS_LD_FLAGS/MKL:=$mkl_ldflags
-+
++BLAS_LD_FLAGS/MKL:=${mkl_ldflags}
+ 
  # Settings for the target compiler.
  CXX := \$(CC_PREFIX) gcc
 -OPTFLAGS := -O2
 +OPTFLAGS := -O3 \$(BLAS_CXX_FLAGS/\$(BLAS)) -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
  
  ifneq (\$(TARGET),ANDROID)
--  OPTFLAGS += -march=native
+-   OPTFLAGS += -march=native
 +   OPTFLAGS += $mopts
  endif
  
 -CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG \$(OPTFLAGS)
 -LDFLAGS := \\
 --L/usr/local/lib
-+CXXFLAGS := --std=c++11 -g1 -DIS_SLIM_BUILD -DNDEBUG \$(OPTFLAGS)
-+LDFLAGS := -L$prefix/lib
++CXXFLAGS := --std=c++11 -g1 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG \$(OPTFLAGS)
++LDFLAGS := -L${prefix}/lib
  DEPFLAGS = -MT \$@ -MMD -MP -MF \$(DEPDIR)/\$*.Td
  
 -INCLUDES := \\
@@ -973,13 +980,14 @@ index 05e8d90..a3a236c 100644
 --I\$(MAKEFILE_DIR)/downloads/gemmlowp \\
 --I\$(MAKEFILE_DIR)/downloads/nsync/public \\
 --I\$(MAKEFILE_DIR)/downloads/fft2d \\
+--I\$(MAKEFILE_DIR)/downloads/double_conversion \\
 --I\$(PROTOGENDIR) \\
 --I\$(PBTGENDIR)
-+INCLUDES := -I. -I\$(PROTOGENDIR) -Ibazel-genfiles -I\$(PBTGENDIR) -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
++INCLUDES := -I. -I\$(PROTOGENDIR) -Ibazel-genfiles -I\$(PBTGENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
-@@ -180,12 +166,7 @@ endif
+@@ -184,12 +168,7 @@ endif
  # override local versions in the source tree.
  INCLUDES += -I/usr/local/include
  
@@ -989,11 +997,11 @@ index 05e8d90..a3a236c 100644
 --lprotobuf \\
 --lz \\
 --lm
-+LIBS := \$(BLAS_LD_FLAGS/\$(BLAS)) -lnsync -lstdc++ -lprotobuf -lz -lm
++LIBS := \$(BLAS_LD_FLAGS/\$(BLAS)) -lnsync_cpp -lnsync -ldouble-conversion -lstdc++ -lprotobuf -lz -lm
  
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	PROTOC := \$(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc
-@@ -215,7 +196,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
+@@ -219,7 +198,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	LIBFLAGS += -L\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  	export LD_LIBRARY_PATH=\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  endif
@@ -1001,7 +1009,7 @@ index 05e8d90..a3a236c 100644
  	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
  	LDFLAGS := -Wl,--no-whole-archive
  endif
-@@ -331,7 +311,7 @@ \$(MARCH_OPTION) \\
+@@ -336,7 +314,7 @@ \$(MARCH_OPTION) \\
  -I\$(PBTGENDIR)
  
  	LIBS := \\
@@ -1010,7 +1018,7 @@ index 05e8d90..a3a236c 100644
  -lgnustl_static \\
  -lprotobuf \\
  -llog \\
-@@ -676,10 +656,184 @@ endif  # TEGRA
+@@ -682,10 +660,187 @@ endif  # TEGRA
  # Filter out all the excluded files.
  TF_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
  # Add in any extra files that don't fit the patterns easily
@@ -1018,7 +1026,8 @@ index 05e8d90..a3a236c 100644
 -TF_CC_SRCS += tensorflow/core/common_runtime/gpu/gpu_id_manager.cc
  # Also include the op and kernel definitions.
 -TF_CC_SRCS += \$(shell cat \$(MAKEFILE_DIR)/tf_op_files.txt)
-+TF_CC_SRCS += tensorflow/core/kernels/argmax_op.cc \\
++TF_CC_SRCS += tensorflow/core/kernels/aggregate_ops.cc \\
++              tensorflow/core/kernels/argmax_op.cc \\
 +              tensorflow/core/kernels/avgpooling_op.cc \\
 +              tensorflow/core/kernels/bcast_ops.cc \\
 +              tensorflow/core/kernels/bias_op.cc \\
@@ -1061,6 +1070,7 @@ index 05e8d90..a3a236c 100644
 +              tensorflow/core/kernels/cwise_op_reciprocal.cc \\
 +              tensorflow/core/kernels/cwise_op_round.cc \\
 +              tensorflow/core/kernels/cwise_op_rsqrt.cc \\
++              tensorflow/core/kernels/cwise_op_select.cc \\
 +              tensorflow/core/kernels/cwise_op_sigmoid.cc \\
 +              tensorflow/core/kernels/cwise_op_sqrt.cc \\
 +              tensorflow/core/kernels/cwise_op_sub.cc \\
@@ -1180,7 +1190,8 @@ index 05e8d90..a3a236c 100644
 +              bazel-genfiles/tensorflow/cc/ops/state_ops.cc \\
 +              bazel-genfiles/tensorflow/cc/ops/training_ops.cc
 +ifeq (\$(BLAS),MKL)
-+	TF_CC_SRCS += tensorflow/core/kernels/mkl_avgpooling_op.cc \\
++    TF_CC_SRCS += tensorflow/core/kernels/mkl_aggregate_ops.cc \\
++                  tensorflow/core/kernels/mkl_avgpooling_op.cc \\
 +                  tensorflow/core/kernels/mkl_concat_op.cc \\
 +                  tensorflow/core/kernels/mkl_conv_ops.cc \\
 +                  tensorflow/core/kernels/mkl_cwise_ops_common.cc \\
@@ -1198,7 +1209,7 @@ index 05e8d90..a3a236c 100644
  PBT_CC_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_pb_text_files.txt)
  PROTO_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_proto_files.txt)
  BENCHMARK_SRCS := \\
-@@ -708,15 +862,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
+@@ -714,15 +869,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
  PROTO_OBJS := \$(addprefix \$(OBJDIR), \$(PROTO_SRCS:.proto=.pb.o))
  LIB_OBJS := \$(PROTO_OBJS) \$(TF_CC_OBJS) \$(PBT_OBJS)
  BENCHMARK_OBJS := \$(addprefix \$(OBJDIR), \$(BENCHMARK_SRCS:.cc=.o))
@@ -1224,7 +1235,7 @@ index 05e8d90..a3a236c 100644
  .phony_version_info:
  tensorflow/core/util/version_info.cc: .phony_version_info
  	tensorflow/tools/git/gen_git_source.sh \$@
-@@ -732,6 +894,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
+@@ -738,6 +901,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
  	-o \$(BENCHMARK_NAME) \$(BENCHMARK_OBJS) \\
  	\$(LIBFLAGS) \$(TEGRA_LIBS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS) \$(CUDA_LIBS)
  
@@ -1241,47 +1252,21 @@ index 05e8d90..a3a236c 100644
  # NVCC compilation rules for Tegra
  ifeq (\$(BUILD_FOR_TEGRA),1)
  \$(OBJDIR)%.cu.o: %.cu.cc
-diff --git a/tensorflow/core/common_runtime/process_util.cc b/tensorflow/core/common_runtime/process_util.cc
-index 7ff360e..f8c9c69 100644
---- a/tensorflow/core/common_runtime/process_util.cc
-+++ b/tensorflow/core/common_runtime/process_util.cc
-@@ -15,9 +15,6 @@ limitations under the License.
- 
- #include "tensorflow/core/common_runtime/process_util.h"
- 
--#ifdef INTEL_MKL
--#include <omp.h>
--#endif
- #include <string.h>
- 
- #include "tensorflow/core/lib/core/threadpool.h"
-@@ -52,22 +49,8 @@ thread::ThreadPool* ComputePool(const SessionOptions& options) {
- int32 NumInterOpThreadsFromSessionOptions(const SessionOptions& options) {
-   const int32 inter_op = options.config.inter_op_parallelism_threads();
-   if (inter_op != 0) return inter_op;
--#ifdef INTEL_MKL
--  // MKL library executes ops in parallel using OMP threads
--  // Set inter_op conservatively to avoid thread oversubscription that could 
--  // lead to severe perf degradations and OMP resource exhaustion
--  const int mkl_intra_op = omp_get_max_threads();
--  CHECK_GE(mkl_intra_op, 1);
--  const int32 mkl_inter_op = std::max(
--          (port::NumSchedulableCPUs() + mkl_intra_op - 1) / mkl_intra_op, 2);
--  VLOG(0) << "Creating new thread pool with default inter op setting: "
--          << mkl_inter_op
--          << ". Tune using inter_op_parallelism_threads for best performance.";
--  return mkl_inter_op;
--#else
-   // Default to using the number of cores available in the process.
-   return port::NumSchedulableCPUs();
--#endif
- }
- 
- thread::ThreadPool* NewThreadPoolFromSessionOptions(
 diff --git a/tensorflow/core/graph/mkl_layout_pass.cc b/tensorflow/core/graph/mkl_layout_pass.cc
-index 5368774..9927c1f 100644
+index b966799..5c3d422 100644
 --- a/tensorflow/core/graph/mkl_layout_pass.cc
 +++ b/tensorflow/core/graph/mkl_layout_pass.cc
+@@ -299,8 +299,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     // End - element-wise ops. See note above.
+ 
+     // NOTE: names are alphabetically sorted.
+-    rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
+-                      CopyAttrsAddN, AddNRewrite, nullptr});
++    /*rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
++                      CopyAttrsAddN, AddNRewrite, nullptr});*/
+     rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
+                       CopyAttrsDataType, AlwaysRewrite, nullptr});
+     rinfo_.push_back({csinfo_.avg_pool,
 @@ -326,9 +326,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
      rinfo_.push_back({csinfo_.concatv2,
                        mkl_op_registry::GetMklOpName(csinfo_.concatv2),
@@ -1306,6 +1291,17 @@ index 5368774..9927c1f 100644
  
      biasaddgrad_matmul_context_ = {csinfo_.bias_add_grad, csinfo_.matmul,
                                     IsBiasAddGradInMatMulContext};
+@@ -2451,8 +2451,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     // End - element-wise ops. See note above.
+ 
+     // NOTE: names are alphabetically sorted.
+-    rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
+-                      CopyAttrsAddN, AddNRewrite});
++    /*rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
++                      CopyAttrsAddN, AddNRewrite});*/
+     rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
+                       CopyAttrsDataType, AlwaysRewrite});
+     rinfo_.push_back({csinfo_.avg_pool,
 @@ -2467,9 +2467,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
      rinfo_.push_back({csinfo_.concatv2,
                        mkl_op_registry::GetMklOpName(csinfo_.concatv2),
@@ -1331,10 +1327,10 @@ index 5368774..9927c1f 100644
      minfo_.push_back({csinfo_.conv2d_grad_filter, csinfo_.bias_add_grad,
                        csinfo_.conv2d_grad_filter_with_bias,
 diff --git a/tensorflow/core/grappler/clusters/utils.cc b/tensorflow/core/grappler/clusters/utils.cc
-index 50d6e64..ec5698a 100644
+index a751972..39bc657 100644
 --- a/tensorflow/core/grappler/clusters/utils.cc
 +++ b/tensorflow/core/grappler/clusters/utils.cc
-@@ -118,19 +118,6 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
+@@ -119,19 +119,6 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
  
    if (device.type == "CPU") {
      return GetLocalCPUInfo();
@@ -1355,7 +1351,7 @@ index 50d6e64..ec5698a 100644
    return unknown;
  }
 diff --git a/tensorflow/core/grappler/costs/utils.cc b/tensorflow/core/grappler/costs/utils.cc
-index f318e39..586cdc8 100644
+index be54d98..0f3c6f7 100644
 --- a/tensorflow/core/grappler/costs/utils.cc
 +++ b/tensorflow/core/grappler/costs/utils.cc
 @@ -207,16 +207,7 @@ DeviceProperties GetDeviceInfo(const string& device_str) {
@@ -1575,10 +1571,10 @@ index e726089..c350757 100644
 +
  }  // namespace tensorflow
 diff --git a/tensorflow/core/ops/math_ops.cc b/tensorflow/core/ops/math_ops.cc
-index 8f8443a..304f9e6 100644
+index c229bd5..583ea27 100644
 --- a/tensorflow/core/ops/math_ops.cc
 +++ b/tensorflow/core/ops/math_ops.cc
-@@ -243,6 +243,28 @@ REGISTER_OP("Atan").UNARY();
+@@ -258,6 +258,28 @@ expected to create these operators.
  #undef UNARY_REAL
  #undef UNARY_COMPLEX
  
@@ -1608,10 +1604,10 @@ index 8f8443a..304f9e6 100644
      .Input("x: T")
      .Output("y: bool")
 diff --git a/tensorflow/core/ops/nn_ops.cc b/tensorflow/core/ops/nn_ops.cc
-index 12d6dc5..c6f321e 100644
+index f947d4c..7e36eaa 100644
 --- a/tensorflow/core/ops/nn_ops.cc
 +++ b/tensorflow/core/ops/nn_ops.cc
-@@ -1054,6 +1054,50 @@ REGISTER_OP("LogSoftmax")
+@@ -1057,6 +1057,50 @@ REGISTER_OP("LogSoftmax")
  
  // --------------------------------------------------------------------------
  

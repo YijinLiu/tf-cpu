@@ -92,41 +92,57 @@ run_obj_detect: $(BIN)/obj_detect \
                 $(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
                 $(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
                 $(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb
+	@echo -e "\e[0;92m Running ssdlite_mobilenet_v2_coco10 ...\e[0m"
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v1_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssdlite_mobilenet_v2_coco10.jpeg \
+	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.pb \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v2_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssdlite_mobilenet_v2_coco10.jpeg \
+	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.pb \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssdlite_mobilenet_v2_coco10.mkv \
+	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.pb \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
+	@echo -e "\e[0;92m Running ssdlite_mobilenet_v2_coco ...\e[0m"
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
 	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssdlite_mobilenet_v2_coco.jpeg \
 	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v1_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v2_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
 	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssdlite_mobilenet_v2_coco.jpeg \
 	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssdlite_mobilenet_v2_coco.mkv \
+	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	@echo -e "\e[0;92m Running ssd_mobilenet_v1_coco ...\e[0m"
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v1_coco.jpeg \
+	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v1_coco.jpeg \
+	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
 	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v1_coco.mkv \
 	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	@echo -e "\e[0;92m Running ssd_mobilenet_v2_coco ...\e[0m"
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v2_coco.jpeg \
+	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v2_coco.jpeg \
+	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
 	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v2_coco.mkv \
 	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssdlite_mobilenet_v2_coco.mkv \
-	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
 
 run_face_detect: $(BIN)/obj_detect \
@@ -188,7 +204,7 @@ $(BIN)/classify.o: $(SRC)/classify.cc $(SRC)/test_video.hpp $(SRC)/utils.hpp
 $(BIN)/classify: $(BIN)/test_video.o $(BIN)/classify.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync -ldouble-conversion \
+	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion \
         $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/obj_detect_lite.o: $(SRC)/obj_detect_lite.cc $(SRC)/test_video.hpp \
@@ -210,7 +226,7 @@ $(BIN)/obj_detect.o: obj_detect.cc test_video.hpp video_encoder.hpp utils.hpp
 $(BIN)/obj_detect: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync -ldouble-conversion $(OPENCV_LDFLAGS) \
+	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion $(OPENCV_LDFLAGS) \
 	    $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp

@@ -7,7 +7,6 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavdevice/avdevice.h>
 #include <libavfilter/avfilter.h>
-#include <libavfilter/avfiltergraph.h>
 #include <libavfilter/buffersink.h>
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
@@ -39,9 +38,11 @@ inline std::string FfmpegErrStr(int rc) {
 
 inline void InitFfmpeg(int log_level) {
     setenv("AV_LOG_FORCE_COLOR", "1", 0);
+#if !FF_API_NEXT
     avcodec_register_all();
     av_register_all();
     avfilter_register_all();
+#endif
     avdevice_register_all();
     avformat_network_init();
     av_log_set_level(log_level);

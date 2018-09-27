@@ -204,7 +204,7 @@ $(BIN)/classify.o: $(SRC)/classify.cc $(SRC)/test_video.hpp $(SRC)/utils.hpp
 $(BIN)/classify: $(BIN)/test_video.o $(BIN)/classify.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion \
+	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion -labsl \
         $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/obj_detect_lite.o: $(SRC)/obj_detect_lite.cc $(SRC)/test_video.hpp \
@@ -213,7 +213,7 @@ $(BIN)/obj_detect_lite.o: $(SRC)/obj_detect_lite.cc $(SRC)/test_video.hpp \
 	g++ -c $(CXXFLAGS) $< -o $@
 
 OPENCV_LDFLAGS=-lopencv_imgcodecs -lopencv_imgproc -lopencv_core \
-    -L/usr/local/share/OpenCV/3rdparty/lib -lippiw -lippicv -llibjpeg
+    -L/usr/local/share/OpenCV/3rdparty/lib -lippiw -lippicv -ljpeg
 
 $(BIN)/obj_detect_lite: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_lite.o
 	mkdir -p $(BIN)
@@ -226,8 +226,8 @@ $(BIN)/obj_detect.o: obj_detect.cc test_video.hpp video_encoder.hpp utils.hpp
 $(BIN)/obj_detect: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion $(OPENCV_LDFLAGS) \
-	    $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion -labsl \
+	    $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)

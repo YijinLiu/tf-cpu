@@ -16,11 +16,11 @@ usage() {
 }
 
 blas=MKL
-version=1.10.0
-bazel_version=0.15.2
+version=1.11.0-rc2
+bazel_version=0.17.2
 prefix=/usr/local
 mopts="-march=native"
-mkldnn_version=
+mkldnn_version=0.16
 
 OPTS=`getopt -n 'build.sh' -o b:,m:,p:,v: -l blas:,version:,bazel_version:,mkldnn_version:,prefix:,mopts: -- "$@"`
 rc=$?
@@ -51,13 +51,134 @@ esac
 install_deps() {
     sudo apt update &&
     sudo apt install -y --no-install-recommends autoconf automake build-essential cmake cpio curl \
-        git libtool openjdk-8-jdk python unzip wget yasm zlib1g-dev $blas_pkgs &&
+        git libjpeg-dev libtool openjdk-8-jdk python unzip wget yasm zlib1g-dev $blas_pkgs &&
     sudo apt clean
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to install dependant packages!${NC}"
         return 1
     fi
+}
+
+install_headers() {
+    src=$1
+    dst=$2
+    for header in $(find $src -name "*.h" -o -name "*.inc") ; do
+        dir=$(dirname $header)
+        sudo mkdir -p $dst/$dir && sudo cp $header $dst/$dir/
+        rc=$?
+        if [ $rc != 0 ]; then
+            echo -e "${RED}Failed to install $header!${NC}"
+            return 1
+        fi
+    done
+}
+
+install_abseil_cpp() {
+    # See tensorflow/workspace.bzl for the tag in use.
+    abseil_tag=f0f15c2778b0e4959244dd25e63f445a455870f5
+    if [ ! -d "abseil-cpp-${abseil_tag}" ]; then
+        wget -O - https://github.com/abseil/abseil-cpp/archive/${abseil_tag}.tar.gz | tar xvzf -
+        rc=$?
+        if [ $rc != 0 ]; then
+            echo -e "${RED}Failed to download abseil-cpp.${NC}"
+            return 1
+        fi
+    fi
+    cd abseil-cpp-${abseil_tag}
+    mkdir -p build
+    cd build
+    cmake .. && make &&
+    ar -r libabsl.a \
+        absl/base/CMakeFiles/absl_dynamic_annotations.dir/dynamic_annotations.cc.o \
+        absl/base/CMakeFiles/absl_malloc_internal.dir/internal/low_level_alloc.cc.o \
+        absl/base/CMakeFiles/absl_throw_delegate.dir/internal/throw_delegate.cc.o \
+        absl/base/CMakeFiles/absl_spinlock_wait.dir/internal/spinlock_wait.cc.o \
+        absl/base/CMakeFiles/absl_base.dir/internal/cycleclock.cc.o \
+        absl/base/CMakeFiles/absl_base.dir/internal/raw_logging.cc.o \
+        absl/base/CMakeFiles/absl_base.dir/internal/spinlock.cc.o \
+        absl/base/CMakeFiles/absl_base.dir/internal/sysinfo.cc.o \
+        absl/base/CMakeFiles/absl_base.dir/internal/thread_identity.cc.o \
+        absl/base/CMakeFiles/absl_base.dir/internal/unscaledcycleclock.cc.o \
+        absl/base/CMakeFiles/absl_base.dir/internal/low_level_alloc.cc.o \
+        absl/container/CMakeFiles/test_instance_tracker_lib.dir/internal/test_instance_tracker.cc.o \
+        absl/debugging/CMakeFiles/absl_stack_consumption.dir/internal/stack_consumption.cc.o \
+        absl/debugging/CMakeFiles/absl_stacktrace.dir/stacktrace.cc.o \
+        absl/debugging/CMakeFiles/absl_stacktrace.dir/internal/address_is_readable.cc.o \
+        absl/debugging/CMakeFiles/absl_stacktrace.dir/internal/elf_mem_image.cc.o \
+        absl/debugging/CMakeFiles/absl_stacktrace.dir/internal/vdso_support.cc.o \
+        absl/debugging/CMakeFiles/absl_leak_check.dir/leak_check.cc.o \
+        absl/debugging/CMakeFiles/absl_symbolize.dir/symbolize.cc.o \
+        absl/debugging/CMakeFiles/absl_symbolize.dir/internal/demangle.cc.o \
+        absl/debugging/CMakeFiles/absl_symbolize.dir/internal/address_is_readable.cc.o \
+        absl/debugging/CMakeFiles/absl_symbolize.dir/internal/elf_mem_image.cc.o \
+        absl/debugging/CMakeFiles/absl_symbolize.dir/internal/vdso_support.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/ascii.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/charconv.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/escaping.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/internal/charconv_bigint.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/internal/charconv_parse.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/internal/memutil.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/internal/utf8.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/internal/ostringstream.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/match.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/numbers.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/str_cat.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/str_replace.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/str_split.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/string_view.cc.o \
+        absl/strings/CMakeFiles/absl_strings.dir/substitute.cc.o \
+        absl/numeric/CMakeFiles/absl_int128.dir/int128.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/time.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/clock.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/duration.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/format.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/civil_time_detail.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_fixed.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_format.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_if.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_impl.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_info.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_libc.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_lookup.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_posix.cc.o \
+        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/zone_info_source.cc.o \
+        absl/debugging/CMakeFiles/absl_examine_stack.dir/internal/examine_stack.cc.o \
+        absl/synchronization/CMakeFiles/absl_synchronization.dir/barrier.cc.o \
+        absl/synchronization/CMakeFiles/absl_synchronization.dir/blocking_counter.cc.o \
+        absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/create_thread_identity.cc.o \
+        absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/per_thread_sem.cc.o \
+        absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/waiter.cc.o \
+        absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/graphcycles.cc.o \
+        absl/synchronization/CMakeFiles/absl_synchronization.dir/notification.cc.o \
+        absl/synchronization/CMakeFiles/absl_synchronization.dir/mutex.cc.o \
+        absl/debugging/CMakeFiles/absl_failure_signal_handler.dir/failure_signal_handler.cc.o \
+        absl/strings/CMakeFiles/str_format_extension_internal.dir/internal/str_format/extension.cc.o \
+        absl/strings/CMakeFiles/str_format_extension_internal.dir/internal/str_format/output.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/arg.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/bind.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/extension.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/float_conversion.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/output.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/parser.cc.o \
+        absl/types/CMakeFiles/absl_variant.dir/bad_variant_access.cc.o \
+        absl/types/CMakeFiles/absl_bad_optional_access.dir/bad_optional_access.cc.o \
+        absl/types/CMakeFiles/absl_bad_any_cast.dir/bad_any_cast.cc.o \
+        absl/types/CMakeFiles/absl_optional.dir/optional.cc.o
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to build abseil-cpp!${NC}"
+        return 1
+    fi
+    cd ..
+    install_headers absl $prefix/include &&
+    sudo cp build/libabsl.a $prefix/lib
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to install abseil-cpp!${NC}"
+        return 1
+    fi
+    cd ..
 }
 
 install_atlas() {
@@ -116,11 +237,11 @@ install_openblas() {
     cd ..
 }
 
-# Visit https://registrationcenter.intel.com/en/products/postregistration/?sn=3VGW-6NPJL6SB
+# Visit https://software.seek.intel.com/performance-libraries
 # to find latest versions of MKL and IPP.
 install_mkl() {
-    prid="13005"
-    ver="2018.3.222"
+    prid="13575"
+    ver="2019.0.117"
     if [ ! -d "l_mkl_${ver}" ]; then
         if [ ! -f "l_mkl_${ver}.tgz" ]; then
             wget http://registrationcenter-download.intel.com/akdlm/irc_nas/tec/${prid}/l_mkl_${ver}.tgz
@@ -177,11 +298,11 @@ install_mkldnn() {
         cd mkl-dnn
         patch -l -p1 <<- EOD
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 048dcfb..0047bab 100644
+index 0e81c88..8b08822 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -54,7 +54,6 @@ if("\${CMAKE_BUILD_TYPE}" STREQUAL "")
- endif()
+@@ -58,7 +58,6 @@ set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
+ set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
  
  include("cmake/platform.cmake")
 -include("cmake/OpenMP.cmake")
@@ -189,10 +310,10 @@ index 048dcfb..0047bab 100644
  include("cmake/MKL.cmake")
  include("cmake/Doxygen.cmake")
 diff --git a/cmake/MKL.cmake b/cmake/MKL.cmake
-index 883fb21..efba5ca 100644
+index 57acaab..ea1b092 100644
 --- a/cmake/MKL.cmake
 +++ b/cmake/MKL.cmake
-@@ -18,167 +18,14 @@
+@@ -18,184 +18,14 @@
  # \${CMAKE_CURRENT_SOURCE_DIR}/external
  #===============================================================================
  
@@ -200,10 +321,7 @@ index 883fb21..efba5ca 100644
 -    return()
 -endif()
 -set(MKL_cmake_included true)
-+set(HAVE_MKL TRUE)
-+set(MKLROOT "${prefix}/intel/mkl")
-+set(MKLINC "\${MKLROOT}/include")
- 
+-
 -function(detect_mkl LIBNAME)
 -    if(HAVE_MKL)
 -        return()
@@ -260,6 +378,14 @@ index 883fb21..efba5ca 100644
 -        endif()
 -    endif()
 -
+-    if(UNIX AND LIBNAME MATCHES "mklml.*")
+-        # Although MKL-ML depends on shared object functions such as dlopen and
+-        # dladdr it is not linked against libdl. This causes link failures when
+-        # MKL-DNN is build with the gold linker (e.g. -fuse-ld=gold).
+-        list(APPEND EXTRA_LIBS dl)
+-        set(EXTRA_LIBS "\${EXTRA_LIBS}" PARENT_SCOPE)
+-    endif()
+-
 -    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
 -        get_filename_component(MKLLIBPATH \${MKLLIB} PATH)
 -        find_library(MKLIOMP5LIB
@@ -289,13 +415,23 @@ index 883fb21..efba5ca 100644
 -    string(FIND "\${MKLLIBPATH}" \${CMAKE_CURRENT_SOURCE_DIR}/external __idx)
 -    if(\${__idx} EQUAL 0)
 -        if(WIN32)
--            install(PROGRAMS \${MKLDLL} DESTINATION lib)
+-            if(MINGW)
+-                # We need to install *.dll into bin/ instead of lib/.
+-                install(PROGRAMS \${MKLDLL} DESTINATION bin)
+-            else()
+-                install(PROGRAMS \${MKLDLL} DESTINATION lib)
+-            endif()
 -        else()
 -            install(PROGRAMS \${MKLLIB} DESTINATION lib)
 -        endif()
 -        if(MKLIOMP5LIB)
 -            if(WIN32)
--                install(PROGRAMS \${MKLIOMP5DLL} DESTINATION lib)
+-                if(MINGW)
+-                    # We need to install *.dll into bin/ instead of lib/.
+-                    install(PROGRAMS \${MKLIOMP5DLL} DESTINATION bin)
+-                else()
+-                    install(PROGRAMS \${MKLIOMP5DLL} DESTINATION lib)
+-                endif()
 -            else()
 -                install(PROGRAMS \${MKLIOMP5LIB} DESTINATION lib)
 -            endif()
@@ -305,7 +441,7 @@ index 883fb21..efba5ca 100644
 -    if(WIN32)
 -        # Add paths to DLL to %PATH% on Windows
 -        get_filename_component(MKLDLLPATH "\${MKLDLL}" PATH)
--        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\\;\${MKLDLLPATH}")
+-        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\;\${MKLDLLPATH}")
 -        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}" PARENT_SCOPE)
 -    endif()
 -
@@ -362,15 +498,19 @@ index 883fb21..efba5ca 100644
 -        "set of libraries or get a full version from "
 -        "https://software.intel.com/en-us/intel-mkl")
 -endif()
++set(HAVE_MKL TRUE)
++set(MKLROOT "${prefix}/intel/mkl")
++set(MKLINC "\${MKLROOT}/include")
++
 +add_definitions(-DUSE_MKL -DUSE_CBLAS)
 +include_directories(AFTER \${MKLINC})
 +list(APPEND EXTRA_LIBS -Wl,--start-group mkl_gf_lp64 mkl_sequential mkl_core -Wl,--end-group pthread dl)
 +SET(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -L${prefix}/intel/mkl/lib")
- 
++ 
 +set(MSG "Intel(R) MKL:")
 +message(STATUS "\${MSG} include \${MKLINC}")
 diff --git a/cmake/SDL.cmake b/cmake/SDL.cmake
-index 12855a7..348037f 100644
+index d0daa32..87e9b77 100644
 --- a/cmake/SDL.cmake
 +++ b/cmake/SDL.cmake
 @@ -23,7 +23,7 @@ endif()
@@ -382,7 +522,7 @@ index 12855a7..348037f 100644
      set(CMAKE_CXX_FLAGS_RELEASE "\${CMAKE_CXX_FLAGS_RELEASE} -D_FORTIFY_SOURCE=2")
      set(CMAKE_C_FLAGS_RELEASE "\${CMAKE_C_FLAGS_RELEASE} -D_FORTIFY_SOURCE=2")
      if("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-@@ -43,7 +43,6 @@ if(UNIX OR APPLE)
+@@ -52,7 +52,6 @@ if(UNIX OR APPLE)
          set(CMAKE_SHARED_LINKER_FLAGS "\${CMAKE_SHARED_LINKER_FLAGS} -Wl,-bind_at_load")
          set(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -Wl,-bind_at_load")
      else()
@@ -391,23 +531,23 @@ index 12855a7..348037f 100644
          set(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
      endif()
 diff --git a/cmake/platform.cmake b/cmake/platform.cmake
-index faabc5d..4b3fa88 100644
+index 44c5427..0e7ac8f 100644
 --- a/cmake/platform.cmake
 +++ b/cmake/platform.cmake
-@@ -67,7 +67,7 @@ elseif(UNIX OR APPLE)
-         set(CMAKE_CCXX_FLAGS "\${CMAKE_CCXX_FLAGS} -Wno-pass-failed")
+@@ -90,7 +90,7 @@ elseif(UNIX OR APPLE OR MINGW)
+             "\${CMAKE_CCXX_NOWARN_FLAGS} -Wno-pass-failed")
      elseif("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
          if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
 -            set(DEF_ARCH_OPT_FLAGS "-march=native -mtune=native")
-+            set(DEF_ARCH_OPT_FLAGS "$mopts")
++            set(DEF_ARCH_OPT_FLAGS "${mopts}")
          endif()
          if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
              # suppress warning on assumptions made regarding overflow (#146)
 diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
-index a65617c..27863c5 100644
+index df14b9d..96d345d 100644
 --- a/examples/CMakeLists.txt
 +++ b/examples/CMakeLists.txt
-@@ -18,7 +18,7 @@ include_directories(\${CMAKE_SOURCE_DIR}/include)
+@@ -27,7 +27,7 @@ include_directories(\${CMAKE_SOURCE_DIR}/include)
  
  add_executable(simple-net-c simple_net.c)
  set_property(TARGET simple-net-c PROPERTY C_STANDARD 99)
@@ -416,7 +556,7 @@ index a65617c..27863c5 100644
  add_test(simple-net-c simple-net-c)
  if(WIN32)
      configure_file(\${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-@@ -28,7 +28,7 @@ endif()
+@@ -37,7 +37,7 @@ endif()
  
  add_executable(simple-net-cpp simple_net.cpp)
  set_property(TARGET simple-net-cpp PROPERTY CXX_STANDARD 11)
@@ -425,7 +565,7 @@ index a65617c..27863c5 100644
  add_test(simple-net-cpp simple-net-cpp)
  if(WIN32)
      configure_file(\${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-@@ -41,7 +41,7 @@ set_property(TARGET simple-training-net-c PROPERTY C_STANDARD 99)
+@@ -50,7 +50,7 @@ set_property(TARGET simple-training-net-c PROPERTY C_STANDARD 99)
  if(WIN32)
  target_link_libraries(simple-training-net-c \${LIB_NAME})
  else()
@@ -434,7 +574,7 @@ index a65617c..27863c5 100644
  endif()
  add_test(simple-training-net-c simple-training-net-c)
  if(WIN32)
-@@ -55,7 +55,7 @@ set_property(TARGET simple-training-net-cpp PROPERTY CXX_STANDARD 11)
+@@ -64,7 +64,7 @@ set_property(TARGET simple-training-net-cpp PROPERTY CXX_STANDARD 11)
  if(WIN32)
  target_link_libraries(simple-training-net-cpp \${LIB_NAME})
  else()
@@ -443,7 +583,7 @@ index a65617c..27863c5 100644
  endif()
  add_test(simple-training-net-cpp simple-training-net-cpp)
  if(WIN32)
-@@ -66,7 +66,11 @@ endif()
+@@ -75,7 +75,11 @@ endif()
  
  add_executable(simple-net-int8-cpp simple_net_int8.cpp)
  set_property(TARGET simple-net-int8-cpp PROPERTY CXX_STANDARD 11)
@@ -456,18 +596,18 @@ index a65617c..27863c5 100644
  if(WIN32)
      configure_file(\${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 2393323..633588a 100644
+index 593b080..7641bcb 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -46,7 +46,7 @@ if(WIN32)
+@@ -69,7 +69,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
      endif()
  endif()
  
 -add_library(\${TARGET_NAME} SHARED \${HEADERS} \${SOURCES})
 +add_library(\${TARGET_NAME} STATIC \${HEADERS} \${SOURCES})
  #Add mkldnn.dll to execution PATH
- set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\\;\${CMAKE_CURRENT_BINARY_DIR}/\${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
- target_link_libraries(\${TARGET_NAME} \${\${TARGET_NAME}_LINKER_LIBS} \${EXTRA_LIBS})
+ if(NOT(MINGW))
+     set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\;\${CMAKE_CURRENT_BINARY_DIR}/\${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
 EOD
         rc=$?
         if [ $rc != 0 ]; then
@@ -498,13 +638,10 @@ install_blas() {
 }
 
 install_eigen() {
-    # Tensorflow needs some latest changes.
-    # TODO: Switch to release after there is a new one.
     # See tensorflow/workspace.bzl for what's the version used by tensorflow.
     eigen_tag=fd6845384b86
     if [ ! -d "eigen-eigen-$eigen_tag" ]; then
-        wget -O eigen-${eigen_tag}.tar.gz https://bitbucket.org/eigen/eigen/get/${eigen_tag}.tar.gz &&
-        tar xvf eigen-${eigen_tag}.tar.gz
+        wget -O - https://bitbucket.org/eigen/eigen/get/${eigen_tag}.tar.gz | tar xzvf -
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download eigen!${NC}"
@@ -525,7 +662,7 @@ install_eigen() {
 
 install_protobuf() {
     if [ ! -d "protobuf" ]; then
-        git clone --depth=1 https://github.com/google/protobuf -b v3.5.1
+        git clone --depth=1 https://github.com/google/protobuf -b v3.6.1
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download protobuf.${NC}"
@@ -572,20 +709,6 @@ install_flatbuffers() {
     cd ../..
 }
 
-install_headers() {
-    src=$1
-    dst=$2
-    for header in $(find $src -name "*.h") ; do
-        dir=$(dirname $header)
-        sudo mkdir -p $dst/$dir && sudo cp $header $dst/$dir/
-        rc=$?
-        if [ $rc != 0 ]; then
-            echo -e "${RED}Failed to install $header!${NC}"
-            return 1
-        fi
-    done
-}
-
 install_gemmlowp() {
     if [ ! -d "gemmlowp" ] ; then
         git clone --depth=1 https://github.com/google/gemmlowp
@@ -609,7 +732,7 @@ install_gemmlowp() {
 
 install_nsync() {
     if [ ! -d "nsync" ] ; then
-        git clone --depth=1 https://github.com/google/nsync
+        git clone --depth=1 https://github.com/google/nsync -b 1.20.1
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download nsync.${NC}"
@@ -674,7 +797,7 @@ install_farmhash() {
 
 install_double_conversion() {
     if [ ! -d "double-conversion" ] ; then
-        git clone --depth=1 https://github.com/google/double-conversion
+        git clone --depth=1 https://github.com/google/double-conversion -b v3.1.1
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download double-conversion.${NC}"
@@ -751,7 +874,7 @@ install_tensorflow() {
         cd tensorflow
         patch -l -p1 <<- EOD
 diff --git a/tensorflow/cc/gradients/math_grad.cc b/tensorflow/cc/gradients/math_grad.cc
-index 35a01e0..851937e 100644
+index 1329b56..b65bf88 100644
 --- a/tensorflow/cc/gradients/math_grad.cc
 +++ b/tensorflow/cc/gradients/math_grad.cc
 @@ -265,6 +265,16 @@ Status SigmoidGrad(const Scope& scope, const Operation& op,
@@ -772,10 +895,10 @@ index 35a01e0..851937e 100644
                  const std::vector<Output>& grad_inputs,
                  std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/cc/gradients/nn_grad.cc b/tensorflow/cc/gradients/nn_grad.cc
-index c73482d..871678a 100644
+index 588e96c..6760415 100644
 --- a/tensorflow/cc/gradients/nn_grad.cc
 +++ b/tensorflow/cc/gradients/nn_grad.cc
-@@ -59,6 +59,16 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
+@@ -125,6 +125,16 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
  }
  REGISTER_GRADIENT_OP("LogSoftmax", LogSoftmaxGrad);
  
@@ -793,77 +916,83 @@ index c73482d..871678a 100644
                        const std::vector<Output>& grad_inputs,
                        std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/contrib/lite/Makefile b/tensorflow/contrib/lite/Makefile
-index df59547..f5f1aa0 100644
---- a/tensorflow/contrib/lite/Makefile
+new file mode 100644
+index 0000000..5904e24
+--- /dev/null
 +++ b/tensorflow/contrib/lite/Makefile
-@@ -1,3 +1,5 @@
+@@ -0,0 +1,70 @@
 +SHELL := /bin/bash
 +
- # Find where we're running from, so we can store generated files here.
- ifeq (\$(origin MAKEFILE_DIR), undefined)
- 	MAKEFILE_DIR := \$(shell dirname \$(realpath \$(lastword \$(MAKEFILE_LIST))))
-@@ -82,9 +84,9 @@ endif
- 
- # Settings for the host compiler.
- CXX := \$(CC_PREFIX) \${TARGET_TOOLCHAIN_PREFIX}g++
--CXXFLAGS += -O3 -DNDEBUG
-+CXXFLAGS += -O3 -DNDEBUG ${mopts}
- CCFLAGS := \${CXXFLAGS}
--CXXFLAGS += --std=c++11
-+CXXFLAGS += --std=c++11 -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
- CC := \$(CC_PREFIX) \${TARGET_TOOLCHAIN_PREFIX}gcc
- AR := \$(CC_PREFIX) \${TARGET_TOOLCHAIN_PREFIX}ar
- CFLAGS :=
-@@ -92,25 +94,9 @@ LDOPTS :=
- LDOPTS += -L/usr/local/lib
- ARFLAGS := -r
- 
--INCLUDES := \\
---I. \\
---I\$(MAKEFILE_DIR)/../../../ \\
---I\$(MAKEFILE_DIR)/downloads/ \\
---I\$(MAKEFILE_DIR)/downloads/eigen \\
---I\$(MAKEFILE_DIR)/downloads/gemmlowp \\
---I\$(MAKEFILE_DIR)/downloads/neon_2_sse \\
---I\$(MAKEFILE_DIR)/downloads/farmhash/src \\
---I\$(MAKEFILE_DIR)/downloads/flatbuffers/include \\
---I\$(GENDIR)
--# This is at the end so any globally-installed frameworks like protobuf don't
--# override local versions in the source tree.
--INCLUDES += -I/usr/local/include
--
--LIBS += \\
---lstdc++ \\
---lpthread \\
---lm \\
---lz
-+INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I${prefix}/include -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++MAKEFILE_DIR := \$(shell dirname \$(realpath \$(lastword \$(MAKEFILE_LIST))))
 +
-+LIBS := -lfarmhash -lstdc++ -lpthread -lm -lz
- 
- # If we're on Linux, also link in the dl library.
- ifeq (\$(HOST_OS),LINUX)
-@@ -172,7 +158,8 @@ \$(wildcard tensorflow/contrib/lite/*test.cc) \\
- \$(wildcard tensorflow/contrib/lite/*/*test.cc) \\
- \$(wildcard tensorflow/contrib/lite/*/*/*test.cc) \\
- \$(wildcard tensorflow/contrib/lite/*/*/*/*test.cc) \\
--\$(wildcard tensorflow/contrib/lite/kernels/test_util.cc) \\
-+tensorflow/contrib/lite/kernels/internal/spectrogram.cc \\
-+tensorflow/contrib/lite/kernels/test_util.cc \\
- \$(MINIMAL_SRCS)
- ifeq (\$(BUILD_TYPE),micro)
- CORE_CC_EXCLUDE_SRCS += \\
-@@ -209,7 +196,7 @@ \$(OBJDIR)%.o: %.c
- 	\$(CC) \$(CCFLAGS) \$(INCLUDES) -c \$< -o \$@
- 
- # The target that's compiled if there's no command-line arguments.
--all: \$(LIB_PATH)  \$(MINIMAL_PATH) \$(BENCHMARK_BINARY)
-+all: \$(LIB_PATH)
- 
- # The target that's compiled for micro-controllers
- micro: \$(LIB_PATH)
++OBJDIR := \$(MAKEFILE_DIR)/gen/obj/
++BINDIR := \$(MAKEFILE_DIR)/gen/bin/
++LIBDIR := \$(MAKEFILE_DIR)/gen/lib/
++GENDIR := \$(MAKEFILE_DIR)/gen/obj/
++
++CC := gcc
++CXX := g++
++CCFLAGS := -O3 -DNDEBUG ${mopts} -DGEMMLOWP_ALLOW_SLOW_SCALAR_FALLBACK -pthread
++CXXFLAGS := \$(CCFLAGS) --std=c++11 -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
++INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I${prefix}/include -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++LIBS := -lfarmhash -lstdc++ -lpthread -lm -lz -ldl
++
++AR := ar
++ARFLAGS := -r
++
++LIB_NAME := libtensorflow-lite.a
++LIB_PATH := \$(LIBDIR)\$(LIB_NAME)
++
++MINIMAL_PATH := \$(BINDIR)minimal
++MINIMAL_SRCS := tensorflow/contrib/lite/examples/minimal/minimal.cc
++MINIMAL_OBJS := \$(addprefix \$(OBJDIR), \$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(MINIMAL_SRCS))))
++
++
++
++CORE_CC_ALL_SRCS := \$(wildcard tensorflow/contrib/lite/*.cc) \\
++                    \$(wildcard tensorflow/contrib/lite/*.c) \\
++                    \$(wildcard tensorflow/contrib/lite/kernels/*.cc) \\
++                    \$(wildcard tensorflow/contrib/lite/kernels/*.c) \\
++                    \$(wildcard tensorflow/contrib/lite/kernels/internal/*.cc) \\
++                    \$(wildcard tensorflow/contrib/lite/kernels/internal/*.c) \\
++                    \$(wildcard tensorflow/contrib/lite/kernels/internal/optimized/*.cc) \\
++                    \$(wildcard tensorflow/contrib/lite/kernels/internal/optimized/*.c) \\
++                    \$(wildcard tensorflow/contrib/lite/kernels/internal/reference/*.cc) \\
++                    \$(wildcard tensorflow/contrib/lite/kernels/internal/reference/*.c) \\
++                    tensorflow/contrib/lite/profiling/time.cc
++CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
++CORE_CC_EXCLUDE_SRCS := \$(wildcard tensorflow/contrib/lite/*test.cc) \\
++                        \$(wildcard tensorflow/contrib/lite/*/*test.cc) \\
++                        \$(wildcard tensorflow/contrib/lite/*/*/*test.cc) \\
++                        \$(wildcard tensorflow/contrib/lite/*/*/*/*test.cc) \\
++                        tensorflow/contrib/lite/kernels/internal/spectrogram.cc \\
++                        tensorflow/contrib/lite/kernels/test_util.cc
++TF_LITE_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
++TF_LITE_CC_OBJS := \$(addprefix \$(OBJDIR), \$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(TF_LITE_CC_SRCS))))
++LIB_OBJS := \$(TF_LITE_CC_OBJS)
++
++\$(OBJDIR)%.o: %.cc
++	@mkdir -p \$(dir \$@)
++	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) -c \$< -o \$@
++
++\$(OBJDIR)%.o: %.c
++	@mkdir -p \$(dir \$@)
++	\$(CC) \$(CCFLAGS) \$(INCLUDES) -c \$< -o \$@
++
++all: \$(LIB_PATH) \$(MINIMAL_PATH)
++
++\$(LIB_PATH): \$(LIB_OBJS)
++	@mkdir -p \$(dir \$@)
++	\$(AR) \$(ARFLAGS) \$(LIB_PATH) \$(LIB_OBJS)
++
++\$(MINIMAL_PATH): \$(MINIMAL_OBJS) \$(LIB_PATH)
++	@mkdir -p \$(dir \$@)
++	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) -o \$(MINIMAL_PATH) \$(MINIMAL_OBJS) \$(LIBFLAGS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS)
++
++clean:
++	rm -rf \$(MAKEFILE_DIR)/gen
 diff --git a/tensorflow/contrib/lite/interpreter.cc b/tensorflow/contrib/lite/interpreter.cc
-index d103786..1f560da 100644
+index 5ab53f4..aeced44 100644
 --- a/tensorflow/contrib/lite/interpreter.cc
 +++ b/tensorflow/contrib/lite/interpreter.cc
 @@ -20,6 +20,8 @@ limitations under the License.
@@ -876,10 +1005,10 @@ index d103786..1f560da 100644
  #include "tensorflow/contrib/lite/context.h"
  #include "tensorflow/contrib/lite/context_util.h"
 diff --git a/tensorflow/contrib/lite/kernels/register.cc b/tensorflow/contrib/lite/kernels/register.cc
-index 22a507e..c3dd680 100644
+index 7b859dc..084d953 100644
 --- a/tensorflow/contrib/lite/kernels/register.cc
 +++ b/tensorflow/contrib/lite/kernels/register.cc
-@@ -195,8 +195,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
+@@ -245,8 +245,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
    // TODO(andrewharp, ahentz): Move these somewhere more appropriate so that
    // custom ops aren't always included by default.
    AddCustom("Mfcc", tflite::ops::custom::Register_MFCC());
@@ -889,10 +1018,10 @@ index 22a507e..c3dd680 100644
              tflite::ops::custom::Register_DETECTION_POSTPROCESS());
  }
 diff --git a/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h b/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
-index becd1f6..b8f3f8c 100644
+index 81dd459..827d497 100644
 --- a/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
 +++ b/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
-@@ -61,8 +61,12 @@ inline void* loadFunction(const char* name) {
+@@ -74,8 +74,12 @@ inline void* loadFunction(const char* name) {
  }
  
  inline bool NNAPIExists() {
@@ -906,10 +1035,10 @@ index becd1f6..b8f3f8c 100644
  
  // NN api types based on NNAPI header file
 diff --git a/tensorflow/contrib/makefile/Makefile b/tensorflow/contrib/makefile/Makefile
-index 1a1ab54..11c598f 100644
+index d962a5e..83d5c89 100644
 --- a/tensorflow/contrib/makefile/Makefile
 +++ b/tensorflow/contrib/makefile/Makefile
-@@ -81,16 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
+@@ -81,17 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  endif
  HOST_LDOPTS += -L/usr/local/lib
  
@@ -922,12 +1051,13 @@ index 1a1ab54..11c598f 100644
 --I\$(MAKEFILE_DIR)/downloads/nsync/public \\
 --I\$(MAKEFILE_DIR)/downloads/fft2d \\
 --I\$(MAKEFILE_DIR)/downloads/double_conversion \\
+--I\$(MAKEFILE_DIR)/downloads/absl \\
 --I\$(HOST_GENDIR)
 +HOST_INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../.. -I\$(HOST_GENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	HOST_INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
-@@ -98,13 +89,7 @@ endif
+@@ -99,13 +89,7 @@ endif
  # override local versions in the source tree.
  HOST_INCLUDES += -I/usr/local/include
  
@@ -938,16 +1068,15 @@ index 1a1ab54..11c598f 100644
 --lpthread \\
 --lm \\
 --lz
-+HOST_LIBS := -lnsync_cpp -lnsync -ldouble-conversion -lstdc++ -lprotobuf -lpthread -lm -lz
++HOST_LIBS := -lnsync_cpp -lnsync -ldouble-conversion -lprotobuf -labsl -lstdc++ -lpthread -lm -lz
  
  # If we're on Linux, also link in the dl library.
  ifeq (\$(HOST_OS),LINUX)
-@@ -153,30 +138,29 @@ PBTGENDIR := \$(GENDIR)proto_text/
- PROTOGENDIR := \$(GENDIR)proto/
+@@ -176,30 +160,28 @@ PROTOGENDIR := \$(GENDIR)proto/
  DEPDIR := \$(GENDIR)dep/
  \$(shell mkdir -p \$(DEPDIR) >/dev/null)
-+ 
-+BLAS?=MKL
+ 
++BLAS?=${blas}
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/MKL:=${mkl_cxxflags}
@@ -955,7 +1084,7 @@ index 1a1ab54..11c598f 100644
 +BLAS_LD_FLAGS/OpenBLAS:=-L${prefix}/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
 +# See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
 +BLAS_LD_FLAGS/MKL:=${mkl_ldflags}
- 
++
  # Settings for the target compiler.
  CXX := \$(CC_PREFIX) gcc
 -OPTFLAGS := -O2
@@ -969,7 +1098,7 @@ index 1a1ab54..11c598f 100644
 -CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG \$(OPTFLAGS)
 -LDFLAGS := \\
 --L/usr/local/lib
-+CXXFLAGS := --std=c++11 -g1 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG \$(OPTFLAGS)
++CXXFLAGS := --std=c++11 -g1 -DIS_SLIM_BUILD -fexceptions -DNDEBUG \$(OPTFLAGS)
 +LDFLAGS := -L${prefix}/lib
  DEPFLAGS = -MT \$@ -MMD -MP -MF \$(DEPDIR)/\$*.Td
  
@@ -981,13 +1110,14 @@ index 1a1ab54..11c598f 100644
 --I\$(MAKEFILE_DIR)/downloads/nsync/public \\
 --I\$(MAKEFILE_DIR)/downloads/fft2d \\
 --I\$(MAKEFILE_DIR)/downloads/double_conversion \\
+--I\$(MAKEFILE_DIR)/downloads/absl \\
 --I\$(PROTOGENDIR) \\
 --I\$(PBTGENDIR)
 +INCLUDES := -I. -I\$(PROTOGENDIR) -Ibazel-genfiles -I\$(PBTGENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
-@@ -184,12 +168,7 @@ endif
+@@ -207,12 +189,7 @@ endif
  # override local versions in the source tree.
  INCLUDES += -I/usr/local/include
  
@@ -997,11 +1127,11 @@ index 1a1ab54..11c598f 100644
 --lprotobuf \\
 --lz \\
 --lm
-+LIBS := \$(BLAS_LD_FLAGS/\$(BLAS)) -lnsync_cpp -lnsync -ldouble-conversion -lstdc++ -lprotobuf -lz -lm
++LIBS := \$(BLAS_LD_FLAGS/\$(BLAS)) -lnsync_cpp -lnsync -ldouble-conversion -labsl -lstdc++ -lprotobuf -lz -lm
  
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	PROTOC := \$(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc
-@@ -219,7 +198,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
+@@ -242,7 +219,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	LIBFLAGS += -L\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  	export LD_LIBRARY_PATH=\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  endif
@@ -1009,7 +1139,7 @@ index 1a1ab54..11c598f 100644
  	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
  	LDFLAGS := -Wl,--no-whole-archive
  endif
-@@ -336,7 +314,7 @@ \$(MARCH_OPTION) \\
+@@ -359,7 +335,7 @@ \$(MARCH_OPTION) \\
  -I\$(PBTGENDIR)
  
  	LIBS := \\
@@ -1018,7 +1148,23 @@ index 1a1ab54..11c598f 100644
  -lgnustl_static \\
  -lprotobuf \\
  -llog \\
-@@ -682,10 +660,187 @@ endif  # TEGRA
+@@ -618,7 +594,6 @@ BENCHMARK_NAME := \$(BINDIR)benchmark
+ # gen_file_lists.sh script.
+ 
+ CORE_CC_ALL_SRCS := \\
+-\$(ABSL_CC_SRCS) \\
+ \$(wildcard tensorflow/core/*.cc) \\
+ \$(wildcard tensorflow/core/common_runtime/*.cc) \\
+ \$(wildcard tensorflow/core/framework/*.cc) \\
+@@ -631,7 +606,6 @@ \$(wildcard tensorflow/core/platform/*/*.cc) \\
+ \$(wildcard tensorflow/core/platform/*/*/*.cc) \\
+ \$(wildcard tensorflow/core/util/*.cc) \\
+ \$(wildcard tensorflow/core/util/*/*.cc) \\
+-\$(wildcard tensorflow/contrib/makefile/downloads/double_conversion/double-conversion/*.cc) \\
+ tensorflow/core/util/version_info.cc
+ # Remove duplicates (for version_info.cc)
+ CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
+@@ -705,10 +679,189 @@ endif  # TEGRA
  # Filter out all the excluded files.
  TF_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
  # Add in any extra files that don't fit the patterns easily
@@ -1044,6 +1190,8 @@ index 1a1ab54..11c598f 100644
 +              tensorflow/core/kernels/cast_op_impl_int64.cc \\
 +              tensorflow/core/kernels/cast_op_impl_int8.cc \\
 +              tensorflow/core/kernels/cast_op_impl_uint16.cc \\
++              tensorflow/core/kernels/cast_op_impl_uint32.cc \\
++              tensorflow/core/kernels/cast_op_impl_uint64.cc \\
 +              tensorflow/core/kernels/cast_op_impl_uint8.cc \\
 +              tensorflow/core/kernels/concat_op.cc \\
 +              tensorflow/core/kernels/concat_lib_cpu.cc \\
@@ -1209,7 +1357,7 @@ index 1a1ab54..11c598f 100644
  PBT_CC_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_pb_text_files.txt)
  PROTO_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_proto_files.txt)
  BENCHMARK_SRCS := \\
-@@ -714,15 +869,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
+@@ -737,15 +890,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
  PROTO_OBJS := \$(addprefix \$(OBJDIR), \$(PROTO_SRCS:.proto=.pb.o))
  LIB_OBJS := \$(PROTO_OBJS) \$(TF_CC_OBJS) \$(PBT_OBJS)
  BENCHMARK_OBJS := \$(addprefix \$(OBJDIR), \$(BENCHMARK_SRCS:.cc=.o))
@@ -1235,7 +1383,7 @@ index 1a1ab54..11c598f 100644
  .phony_version_info:
  tensorflow/core/util/version_info.cc: .phony_version_info
  	tensorflow/tools/git/gen_git_source.sh \$@
-@@ -738,6 +901,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
+@@ -761,6 +922,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
  	-o \$(BENCHMARK_NAME) \$(BENCHMARK_OBJS) \\
  	\$(LIBFLAGS) \$(TEGRA_LIBS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS) \$(CUDA_LIBS)
  
@@ -1252,80 +1400,6 @@ index 1a1ab54..11c598f 100644
  # NVCC compilation rules for Tegra
  ifeq (\$(BUILD_FOR_TEGRA),1)
  \$(OBJDIR)%.cu.o: %.cu.cc
-diff --git a/tensorflow/core/graph/mkl_layout_pass.cc b/tensorflow/core/graph/mkl_layout_pass.cc
-index b966799..5c3d422 100644
---- a/tensorflow/core/graph/mkl_layout_pass.cc
-+++ b/tensorflow/core/graph/mkl_layout_pass.cc
-@@ -299,8 +299,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     // End - element-wise ops. See note above.
- 
-     // NOTE: names are alphabetically sorted.
--    rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
--                      CopyAttrsAddN, AddNRewrite, nullptr});
-+    /*rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
-+                      CopyAttrsAddN, AddNRewrite, nullptr});*/
-     rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
-                       CopyAttrsDataType, AlwaysRewrite, nullptr});
-     rinfo_.push_back({csinfo_.avg_pool,
-@@ -326,9 +326,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     rinfo_.push_back({csinfo_.concatv2,
-                       mkl_op_registry::GetMklOpName(csinfo_.concatv2),
-                       CopyAttrsConcatV2, AlwaysRewrite, nullptr});
--    rinfo_.push_back({csinfo_.conv2d,
--                      mkl_op_registry::GetMklOpName(csinfo_.conv2d),
--                      CopyAttrsConv2D, AlwaysRewrite, nullptr});
-+    //rinfo_.push_back({csinfo_.conv2d,
-+    //                  mkl_op_registry::GetMklOpName(csinfo_.conv2d),
-+    //                  CopyAttrsConv2D, AlwaysRewrite, nullptr});
-     rinfo_.push_back({csinfo_.conv2d_grad_filter,
-                       mkl_op_registry::GetMklOpName(csinfo_.conv2d_grad_filter),
-                       CopyAttrsConv2D, AlwaysRewrite, nullptr});
-@@ -380,8 +380,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     wsinfo_.push_back({csinfo_.max_pool, csinfo_.max_pool_grad, 0, 1, 1, 3});
- 
-     // Add a rule for merging nodes
--    minfo_.push_back({csinfo_.mkl_conv2d, csinfo_.bias_add, 0,
--                      csinfo_.mkl_conv2d_with_bias});
-+    //minfo_.push_back({csinfo_.mkl_conv2d, csinfo_.bias_add, 0,
-+    //                  csinfo_.mkl_conv2d_with_bias});
- 
-     biasaddgrad_matmul_context_ = {csinfo_.bias_add_grad, csinfo_.matmul,
-                                    IsBiasAddGradInMatMulContext};
-@@ -2451,8 +2451,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     // End - element-wise ops. See note above.
- 
-     // NOTE: names are alphabetically sorted.
--    rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
--                      CopyAttrsAddN, AddNRewrite});
-+    /*rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
-+                      CopyAttrsAddN, AddNRewrite});*/
-     rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
-                       CopyAttrsDataType, AlwaysRewrite});
-     rinfo_.push_back({csinfo_.avg_pool,
-@@ -2467,9 +2467,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     rinfo_.push_back({csinfo_.concatv2,
-                       mkl_op_registry::GetMklOpName(csinfo_.concatv2),
-                       CopyAttrsConcatV2, AlwaysRewrite});
--    rinfo_.push_back({csinfo_.conv2d,
--                      mkl_op_registry::GetMklOpName(csinfo_.conv2d),
--                      CopyAttrsConv2D, AlwaysRewrite});
-+    //rinfo_.push_back({csinfo_.conv2d,
-+    //                  mkl_op_registry::GetMklOpName(csinfo_.conv2d),
-+    //                  CopyAttrsConv2D, AlwaysRewrite});
-     rinfo_.push_back({csinfo_.conv2d_with_bias, csinfo_.mkl_conv2d_with_bias,
-                       CopyAttrsConv2D, AlwaysRewrite});
-     rinfo_.push_back({csinfo_.conv2d_grad_filter,
-@@ -2541,8 +2541,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     wsinfo_.push_back({csinfo_.max_pool, csinfo_.max_pool_grad, 0, 1, 1, 3});
- 
-     // Add a rule for merging nodes
--    minfo_.push_back({csinfo_.conv2d, csinfo_.bias_add,
--                      csinfo_.conv2d_with_bias, GetConv2DOrBiasAdd});
-+    //minfo_.push_back({csinfo_.conv2d, csinfo_.bias_add,
-+    //                  csinfo_.conv2d_with_bias, GetConv2DOrBiasAdd});
- 
-     minfo_.push_back({csinfo_.conv2d_grad_filter, csinfo_.bias_add_grad,
-                       csinfo_.conv2d_grad_filter_with_bias,
 diff --git a/tensorflow/core/grappler/clusters/utils.cc b/tensorflow/core/grappler/clusters/utils.cc
 index a751972..39bc657 100644
 --- a/tensorflow/core/grappler/clusters/utils.cc
@@ -1351,7 +1425,7 @@ index a751972..39bc657 100644
    return unknown;
  }
 diff --git a/tensorflow/core/grappler/costs/utils.cc b/tensorflow/core/grappler/costs/utils.cc
-index be54d98..0f3c6f7 100644
+index aad00ce..76e2891 100644
 --- a/tensorflow/core/grappler/costs/utils.cc
 +++ b/tensorflow/core/grappler/costs/utils.cc
 @@ -207,16 +207,7 @@ DeviceProperties GetDeviceInfo(const string& device_str) {
@@ -1437,7 +1511,7 @@ index c132fdb..c07ef05 100644
 +
  }  // namespace tensorflow
 diff --git a/tensorflow/core/kernels/neon/depthwiseconv_float.h b/tensorflow/core/kernels/neon/depthwiseconv_float.h
-index 11f5be7..fbc13c8 100644
+index 0d5a42b..0b5f00a 100644
 --- a/tensorflow/core/kernels/neon/depthwiseconv_float.h
 +++ b/tensorflow/core/kernels/neon/depthwiseconv_float.h
 @@ -23,6 +23,23 @@ limitations under the License.
@@ -1465,7 +1539,7 @@ index 11f5be7..fbc13c8 100644
  namespace neon {
  
 diff --git a/tensorflow/core/kernels/softmax_op.cc b/tensorflow/core/kernels/softmax_op.cc
-index e726089..c350757 100644
+index 93a7537..6bdc871 100644
 --- a/tensorflow/core/kernels/softmax_op.cc
 +++ b/tensorflow/core/kernels/softmax_op.cc
 @@ -15,6 +15,8 @@ limitations under the License.
@@ -1485,7 +1559,7 @@ index e726089..c350757 100644
  #include "tensorflow/core/kernels/softmax_op_functor.h"
  
  namespace tensorflow {
-@@ -102,4 +105,84 @@ REGISTER_KERNEL_BUILDER(
+@@ -103,4 +106,84 @@ REGISTER_KERNEL_BUILDER(
      Name("Softmax").Device(DEVICE_SYCL).TypeConstraint<double>("T"),
      SoftmaxOp<SYCLDevice, double>);
  #endif  // TENSORFLOW_USE_SYCL
@@ -1571,10 +1645,10 @@ index e726089..c350757 100644
 +
  }  // namespace tensorflow
 diff --git a/tensorflow/core/ops/math_ops.cc b/tensorflow/core/ops/math_ops.cc
-index c229bd5..583ea27 100644
+index 717263a..ca67cae 100644
 --- a/tensorflow/core/ops/math_ops.cc
 +++ b/tensorflow/core/ops/math_ops.cc
-@@ -258,6 +258,28 @@ expected to create these operators.
+@@ -260,6 +260,28 @@ expected to create these operators.
  #undef UNARY_REAL
  #undef UNARY_COMPLEX
  
@@ -1604,10 +1678,10 @@ index c229bd5..583ea27 100644
      .Input("x: T")
      .Output("y: bool")
 diff --git a/tensorflow/core/ops/nn_ops.cc b/tensorflow/core/ops/nn_ops.cc
-index f947d4c..7e36eaa 100644
+index 2485fa4..58c4db8 100644
 --- a/tensorflow/core/ops/nn_ops.cc
 +++ b/tensorflow/core/ops/nn_ops.cc
-@@ -1057,6 +1057,50 @@ REGISTER_OP("LogSoftmax")
+@@ -1059,6 +1059,50 @@ REGISTER_OP("LogSoftmax")
  
  // --------------------------------------------------------------------------
  
@@ -1750,7 +1824,7 @@ install_x264() {
 
 install_ffmpeg() {
     # Set this variable to empty to use the HEAD.
-    ffver=3.4.2
+    ffver=4.0.2
     if [ ! -d "ffmpeg" ] ; then
         git clone --depth=1 git://source.ffmpeg.org/ffmpeg.git -b n$ffver
         rc=$?
@@ -1852,7 +1926,7 @@ install_google_benchmark() {
 }
 
 install_opencv() {
-    ver=3.4.1
+    ver=3.4.3
     if [ ! -d "opencv" ]; then
         git clone --depth=1 https://github.com/opencv/opencv -b ${ver}
         rc=$?
@@ -1986,6 +2060,7 @@ install_opencv() {
 }
 
 install_deps &&
+install_abseil_cpp &&
 install_blas &&
 install_eigen &&
 install_protobuf &&

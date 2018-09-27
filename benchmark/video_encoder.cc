@@ -53,7 +53,7 @@ bool VideoEncoder::Init(enum AVPixelFormat pix_fmt, int width, int height, AVRat
     }
     enc_ctx_->codec_type = AVMEDIA_TYPE_VIDEO;
     if ((fmt_ctx_->oformat->flags & AVFMT_GLOBALHEADER) != 0) {
-        enc_ctx_->flags |= CODEC_FLAG_GLOBAL_HEADER;
+        enc_ctx_->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     }
     enc_ctx_->pix_fmt = AV_PIX_FMT_YUV420P;
     enc_ctx_->width = width;
@@ -95,7 +95,7 @@ bool VideoEncoder::Init(enum AVPixelFormat pix_fmt, int width, int height, AVRat
         }
         av_opt_set_int(graph_, "threads", 1, 0);
         // Create "buffer" filter.
-        AVFilter* buffersrc  = avfilter_get_by_name("buffer");
+        const AVFilter* buffersrc  = avfilter_get_by_name("buffer");
         const std::string buffersrc_args = Sprintf(
             "video_size=%dx%d:pix_fmt=%s:time_base=1/90000", width, height,
             av_get_pix_fmt_name(pix_fmt));
@@ -107,7 +107,7 @@ bool VideoEncoder::Init(enum AVPixelFormat pix_fmt, int width, int height, AVRat
             return false;
         }
         // Create "buffersink" filter.
-        AVFilter* buffersink = avfilter_get_by_name("buffersink");
+        const AVFilter* buffersink = avfilter_get_by_name("buffersink");
         rc = avfilter_graph_create_filter(&out_, buffersink, "out", nullptr, nullptr, graph_);
         if (rc < 0) {
             LOG(ERROR) << "avfilter_graph_create_filter(buffersink) failed: " << FfmpegErrStr(rc);
@@ -178,7 +178,7 @@ bool VideoEncoder::EncodeAVFrame(AVFrame* frame) {
     bool success = true;
     // Flush encoder buffer.
     if (frame == nullptr) {
-        if ((enc_ctx_->codec->capabilities | CODEC_CAP_DELAY) != 0) success = DoEncode(nullptr);
+        if ((enc_ctx_->codec->capabilities | AV_CODEC_CAP_DELAY) != 0) success = DoEncode(nullptr);
     } else if (graph_ != nullptr) {
         // Convert.
         int rc = av_buffersrc_add_frame_flags(

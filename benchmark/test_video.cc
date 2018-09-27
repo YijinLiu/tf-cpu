@@ -122,7 +122,7 @@ bool TestVideo::Init(const std::string& file, const char* format, bool keep_ar) 
         // Keep aspect ratio.
         height_ = height * width_ / width;
     }
-    AVFilter* buffersrc  = avfilter_get_by_name("buffer");
+    const AVFilter* buffersrc  = avfilter_get_by_name("buffer");
     const std::string buffersrc_args = Sprintf(
         "video_size=%dx%d:pix_fmt=%s:time_base=1/90000", width, height,
         av_get_pix_fmt_name(pix_fmt));
@@ -133,7 +133,7 @@ bool TestVideo::Init(const std::string& file, const char* format, bool keep_ar) 
         return false;
     }
     // Create "buffersink" filter.
-    AVFilter* buffersink = avfilter_get_by_name("buffersink");
+    const AVFilter* buffersink = avfilter_get_by_name("buffersink");
     rc = avfilter_graph_create_filter(&out_, buffersink, "out", nullptr, nullptr, graph_);
     if (rc < 0) {
         LOG(ERROR) << "avfilter_graph_create_filter(buffersink) failed: " << FfmpegErrStr(rc);
@@ -244,7 +244,7 @@ AVFrame* TestVideo::NextFrame() {
         av_frame_free(&frame);
         return NextFrame();
     }
-    frame->pts = av_frame_get_best_effort_timestamp(frame);
+    frame->pts = frame->best_effort_timestamp;
     return frame;
 }
 

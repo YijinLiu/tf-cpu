@@ -16,7 +16,7 @@ usage() {
 }
 
 blas=MKL
-version=1.11.0-rc2
+version=1.11.0
 bazel_version=0.17.2
 prefix=/usr/local
 mopts="-march=native"

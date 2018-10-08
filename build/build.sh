@@ -1079,7 +1079,7 @@ index d962a5e..83d5c89 100644
 +BLAS?=${blas}
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
-+BLAS_CXX_FLAGS/MKL:=${mkl_cxxflags}
++BLAS_CXX_FLAGS/MKL:=${mkl_cxxflags} -fexceptions
 +BLAS_LD_FLAGS/ATLAS:=-L${prefix}/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
 +BLAS_LD_FLAGS/OpenBLAS:=-L${prefix}/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
 +# See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/

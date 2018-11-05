@@ -270,7 +270,7 @@ class ObjDetector {
     bool RunImage(const std::string file_name, int width, int height,
                   const std::string& output) {
         cv::Mat mat = cv::imread(file_name);
-        if (!mat.data) {
+        if (mat.empty()) {
             LOG(ERROR) << "Failed to read image " << file_name;
             return false;
         }
@@ -453,30 +453,8 @@ int main(int argc, char** argv) {
 }
 
 /*
-1. Intel(R) Core(TM) i5-5575R CPU @ 2.80GHz
-w/ MKLDNN (_MklConv2D disabled)
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 37664 ms(129 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 42045 ms(144 mspf).
-beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 31160 ms(107 mspf).
-
-w/ MKL (_MklConv2D disabled)
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 37324 ms(128 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 42126 ms(145 mspf).
-beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 29235 ms(100 mspf).
-
-w/o BLAS
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 37664 ms(129 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 40257 ms(138 mspf).
-beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 31705 ms(109 mspf).
-
-2. Intel(R) Core(TM) i7-5557U CPU @ 3.10GHz
-w/ MKLDNN (_MklConv2D disabled)
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 36399 ms(125 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 40691 ms(140 mspf).
-beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 28642 ms(98 mspf).
-
-w/ MKL (_MklConv2D disabled)
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 36399 ms(125 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 40691 ms(140 mspf).
-beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 28642 ms(98 mspf).
+1. Intel(R) Core(TM) i3-4130 CPU @ 3.40GHz
+beach.ssdlite_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 29346 ms(101 mspf).
+beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 39176 ms(135 mspf).
+beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 39824 ms(137 mspf).
 */

@@ -1,5 +1,6 @@
 .SECONDARY:
 
+SHELL:=/bin/bash
 PROJECT_ROOT:=$(shell readlink -f $(dir $(lastword $(MAKEFILE_LIST)))/..)
 SRC:=$(PROJECT_ROOT)/benchmark
 BIN:=$(PROJECT_ROOT)/benchmark/bin
@@ -40,7 +41,7 @@ run_classify_lite: $(BIN)/classify_lite \
 	$(BIN)/classify_lite
 
 run_obj_detect_lite: $(BIN)/obj_detect_lite
-	@echo -e "\e[0;92m Running ssdlite_mobilenet_v2_coco10_lite ...\e[0m"
+	@echo -e "\e[0;92mRunning ssdlite_mobilenet_v2_coco10_lite ...\e[0m"
 	$(BIN)/obj_detect_lite \
 	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssdlite_mobilenet_v2_coco10_lite.jpeg \
 	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.tflite \
@@ -88,62 +89,29 @@ run_classify: $(BIN)/classify \
               $(TESTDATA)/mobilenet_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/classify
 
-run_obj_detect: $(BIN)/obj_detect \
-                $(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
-                $(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
-                $(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb
-	@echo -e "\e[0;92m Running ssdlite_mobilenet_v2_coco10 ...\e[0m"
+run_obj_detect: run_obj_detect_ssd_mobilenet_v1_coco_2017_11_17 \
+                run_obj_detect_ssd_mobilenet_v2_coco_2018_05_09 \
+                run_obj_detect_ssdlite_mobilenet_v2_coco_2018_05_09 \
+                run_obj_detect_ssd_mobilenet_v1_fpn_shared_box_predictor_640x640_coco14_sync_2018_07_03 \
+                run_obj_detect_ssdlite_mobilenet_v2_coco10
+
+OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v1_coco_2017_11_17=coco_labels.txt
+OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v2_coco_2018_05_09=coco_labels.txt
+OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_coco_2018_05_09=coco_labels.txt
+OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v1_fpn_shared_box_predictor_640x640_coco14_sync_2018_07_03=coco_labels.txt
+OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_coco10=coco10_labels.txt
+
+run_obj_detect_%: $(TESTDATA)/%_frozen.pb $(BIN)/obj_detect
+	@echo -e "\e[0;92mRunning $* ...\e[0m"
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssdlite_mobilenet_v2_coco10.jpeg \
-	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
+	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.$*.jpeg \
+	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssdlite_mobilenet_v2_coco10.jpeg \
-	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
+	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.$*.jpeg \
+	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssdlite_mobilenet_v2_coco10.mkv \
-	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
-	@echo -e "\e[0;92m Running ssdlite_mobilenet_v2_coco ...\e[0m"
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssdlite_mobilenet_v2_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssdlite_mobilenet_v2_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssdlite_mobilenet_v2_coco.mkv \
-	    --model_file=$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	@echo -e "\e[0;92m Running ssd_mobilenet_v1_coco ...\e[0m"
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v1_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v1_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v1_coco.mkv \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v1_coco_2017_11_17_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	@echo -e "\e[0;92m Running ssd_mobilenet_v2_coco ...\e[0m"
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssd_mobilenet_v2_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssd_mobilenet_v2_coco.jpeg \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssd_mobilenet_v2_coco.mkv \
-	    --model_file=$(TESTDATA)/ssd_mobilenet_v2_coco_2018_03_29_frozen.pb \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco_labels.txt
+	    --video_file=$(TESTDATA)/beach.mkv --output=beach.$*.mkv \
+	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 
 run_face_detect: $(BIN)/obj_detect \
                  $(TESTDATA)/frozen_inference_graph_face.pb \
@@ -161,7 +129,7 @@ train_mnist: $(BIN)/mnist \
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/mnist -data_dir=$(TESTDATA)/mnist_data
 
 PREFIX?=/usr/local
-BLAS?=MKL
+BLAS?=
 USE_MKLDNN?=
 BLAS_CXXFLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 BLAS_CXXFLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
@@ -254,6 +222,9 @@ $(TESTDATA)/mobilenet_v1_%_frozen.pb: $(PROJECT_ROOT)/models/mobilenet/v1/mobile
 
 $(TESTDATA)/mobilenet_v2_%_frozen.pb: $(PROJECT_ROOT)/models/mobilenet/v2/mobilenet_v2_%.tgz
 	cd $(TESTDATA) ; tar xf $< ./mobilenet_v2_$*_frozen.pb ; touch $@
+
+$(TESTDATA)/ssdlite_mobilenet_v2_coco10_frozen.pb: $(PROJECT_ROOT)/models/objdetect/coco10.pb
+	cp $< $@
 
 $(TESTDATA)/%_frozen.pb: $(PROJECT_ROOT)/models/objdetect/%.tar.gz
 	cd $(TESTDATA) ; tar xf $< $*/frozen_inference_graph.pb -O > $@

@@ -1,5 +1,7 @@
 *.pb
 *.tflite
+*.jpeg
+*.mkv
 mobilenet_labels.txt
 face_labels.txt
 mnist_data

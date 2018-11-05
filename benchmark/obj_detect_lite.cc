@@ -383,17 +383,6 @@ int main(int argc, char** argv) {
 }
 
 /*
-1. Intel(R) Core(TM) i7-5557U CPU @ 3.10GHz
-w/ MKL
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 41257 ms(142 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 61532 ms(212 mspf).
-
-w/o MKL
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 33869 ms(116 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 37889 ms(130 mspf).
-
-2. Intel(R) Celeron(R) CPU N3450 @ 1.10GHz
-w/o MKL
-beach.ssd_mobilenet_v1_coco.mkv: 290 320x180 frames processed in 242475 ms(836 mspf).
-beach.ssd_mobilenet_v2_coco.mkv: 290 320x180 frames processed in 303421 ms(1046 mspf).
+1. Intel(R) Core(TM) i3-4130 CPU @ 3.40GHz
+beach.ssdlite_mobilenet_v2_coco10_lite.mkv: 290 300x300 frames processed in 14515 ms(50 mspf).
 */

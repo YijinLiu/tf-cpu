@@ -16,7 +16,7 @@ usage() {
 }
 
 blas=MKL
-version=1.11.0-rc2
+version=1.11.0
 bazel_version=0.17.2
 prefix=/usr/local
 mopts="-march=native"
@@ -1956,7 +1956,7 @@ install_opencv() {
           -DBUILD_ITT=OFF \
           -DBUILD_FAT_JAVA_LIB=OFF \
           -DBUILD_JASPER=OFF \
-          -DBUILD_JPEG=ON \
+          -DBUILD_JPEG=OFF \
           -DBUILD_OPENEXR=OFF \
           -DBUILD_PNG=OFF \
           -DBUILD_PROTOBUF=OFF \
@@ -2017,7 +2017,6 @@ install_opencv() {
           -DBUILD_opencv_xobjdetect=OFF \
           -DBUILD_opencv_xphoto=OFF \
           -DCMAKE_INSTALL_PREFIX=${prefix} \
-          -DMKL_ROOT_DIR=${prefix}/intel/mkl \
           -DCMAKE_C_COMPILER=/usr/bin/gcc \
           -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
           -DOPENCV_EXTRA_MODULES_PATH=../contrib/modules \

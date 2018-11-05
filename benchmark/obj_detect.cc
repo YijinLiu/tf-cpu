@@ -9,6 +9,7 @@
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -21,14 +22,15 @@ DEFINE_string(model_file, "", "");
 DEFINE_string(labels_file, "", "");
 
 DEFINE_string(video_file, "", "");
-DEFINE_string(image_file, "", "");
+DEFINE_string(image_files, "", "Comma separated image files");
 DEFINE_int32(width, 320, "");
 DEFINE_int32(height, 0, "");
-DEFINE_string(output, "", "");
+DEFINE_string(output_dir, ".", "");
 DEFINE_bool(output_video, true, "");
 DEFINE_int32(batch_size, 1, "");
 
 DEFINE_int32(ffmpeg_log_level, 8, "");
+DEFINE_bool(output_text_graph_def, false, "");
 
 namespace {
 
@@ -113,6 +115,12 @@ class ObjDetector {
             LOG(ERROR) << "Failed to load mode file " << model_file << status;
             return false;
         }
+        if (FLAGS_output_text_graph_def) {
+            std::ofstream ofs(model_file + ".txt");
+            google::protobuf::io::OstreamOutputStream oos(&ofs);
+            google::protobuf::TextFormat::Print(graph_def_, &oos);
+            LOG(INFO) << "Written to " << model_file << ".txt";
+        }
 
         // Create graph.
         tensorflow::SessionOptions sess_opts;
@@ -167,7 +175,6 @@ class ObjDetector {
         labels_ = labels;
         return true;
     }
-
 
     bool RunVideo(const std::string& video_file, int width, int height, int batch_size,
                   const std::string& output_name, bool output_video) {
@@ -267,34 +274,24 @@ class ObjDetector {
         return true;
     }
 
-    bool RunImage(const std::string file_name, int width, int height,
-                  const std::string& output) {
+    bool RunImage(const std::string& file_name, const std::string& output) {
         cv::Mat mat = cv::imread(file_name);
         if (mat.empty()) {
             LOG(ERROR) << "Failed to read image " << file_name;
             return false;
         }
-        if (width == 0 && height == 0) {
-            width = mat.cols;
-            height = mat.rows;
-        } else if (width == 0) {
-            width = mat.cols * height / mat.rows;
-        } else if (height == 0) {
-            height = mat.rows * width / mat.cols;
-        }
-        InitInputTensor(1, width, height);
-        if (width != mat.cols || height != mat.rows) {
-            cv::Mat resized;
-            cv::resize(mat, resized, cv::Size(width, height));
-            cv::cvtColor(resized, resized, cv::COLOR_BGR2RGB);
-            FeedInMat(resized, 0);
-        } else {
-            cv::Mat for_tf;
-            cv::cvtColor(mat, for_tf, cv::COLOR_BGR2RGB);
-            FeedInMat(for_tf, 0);
-        }
         std::vector<tensorflow::Tensor> output_tensors;
+        cv::Mat for_tf;
+        cv::cvtColor(mat, for_tf, cv::COLOR_BGR2RGB);
+        const auto start = std::chrono::high_resolution_clock::now();
+        InitInputTensor(1, mat.cols, mat.rows);
+        FeedInMat(for_tf, 0);
         if (!Run(&output_tensors)) return false;
+        const std::chrono::duration<double> duration =
+            std::chrono::high_resolution_clock::now() - start;
+        const auto elapsed_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+        printf("%s processed in %d ms.\n", file_name.c_str(), (int)elapsed_ms);
         AnnotateMat(mat, output_tensors, 0);
         cv::imwrite(output, mat);
         return true;
@@ -434,6 +431,19 @@ class ObjDetector {
     std::unique_ptr<tensorflow::Tensor> input_tensor_;
 };
 
+std::vector<std::string> split(const std::string& s, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream token_stream(s);
+    while (std::getline(token_stream, token, delimiter)) tokens.push_back(token);
+    return tokens;
+}
+
+std::string filename_base(const std::string& filename) {
+    std::string filename_copy(filename);
+    return basename(filename_copy.data());
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -446,9 +456,12 @@ int main(int argc, char** argv) {
     if (!obj_detector.Init(FLAGS_model_file, labels)) return 1;
     if (!FLAGS_video_file.empty()) {
         obj_detector.RunVideo(FLAGS_video_file, FLAGS_width, FLAGS_height, FLAGS_batch_size,
-                              FLAGS_output, FLAGS_output_video);
-    } else if (!FLAGS_image_file.empty()) {
-        obj_detector.RunImage(FLAGS_image_file, FLAGS_width, FLAGS_height, FLAGS_output);
+                              FLAGS_output_dir + "/" + filename_base(FLAGS_video_file),
+                              FLAGS_output_video);
+    } else if (!FLAGS_image_files.empty()) {
+        for (const std::string& img_file : split(FLAGS_image_files, ',')) {
+            obj_detector.RunImage(img_file, FLAGS_output_dir + "/" + filename_base(img_file));
+        }
     }
 }
 

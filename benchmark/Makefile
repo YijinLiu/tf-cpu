@@ -103,14 +103,12 @@ OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_coco10=coco10_labels.txt
 
 run_obj_detect_%: $(TESTDATA)/%_frozen.pb $(BIN)/obj_detect
 	@echo -e "\e[0;92mRunning $* ...\e[0m"
+	@mkdir -p $*
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.$*.jpeg \
+	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg --output_dir=$* \
 	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.$*.jpeg \
-	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.$*.mkv \
+	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$* \
 	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 
 run_face_detect: $(BIN)/obj_detect \

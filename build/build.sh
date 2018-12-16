@@ -16,11 +16,11 @@ usage() {
 }
 
 blas=MKL
-version=1.11.0
-bazel_version=0.17.2
+version=1.12.0
+bazel_version=0.19.2
 prefix=/usr/local
 mopts="-march=native"
-mkldnn_version=0.16
+mkldnn_version=0.17.1
 
 OPTS=`getopt -n 'build.sh' -o b:,m:,p:,v: -l blas:,version:,bazel_version:,mkldnn_version:,prefix:,mopts: -- "$@"`
 rc=$?
@@ -76,7 +76,7 @@ install_headers() {
 
 install_abseil_cpp() {
     # See tensorflow/workspace.bzl for the tag in use.
-    abseil_tag=f0f15c2778b0e4959244dd25e63f445a455870f5
+    abseil_tag=48cd2c3f351ff188bc85684b84a91b6e6d17d896
     if [ ! -d "abseil-cpp-${abseil_tag}" ]; then
         wget -O - https://github.com/abseil/abseil-cpp/archive/${abseil_tag}.tar.gz | tar xvzf -
         rc=$?
@@ -240,8 +240,8 @@ install_openblas() {
 # Visit https://software.seek.intel.com/performance-libraries
 # to find latest versions of MKL and IPP.
 install_mkl() {
-    prid="13575"
-    ver="2019.0.117"
+    prid="14895"
+    ver="2019.1.144"
     if [ ! -d "l_mkl_${ver}" ]; then
         if [ ! -f "l_mkl_${ver}.tgz" ]; then
             wget http://registrationcenter-download.intel.com/akdlm/irc_nas/tec/${prid}/l_mkl_${ver}.tgz
@@ -298,22 +298,22 @@ install_mkldnn() {
         cd mkl-dnn
         patch -l -p1 <<- EOD
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 0e81c88..8b08822 100644
+index b79aea4..754c098 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -58,7 +58,6 @@ set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
- set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
+@@ -66,7 +66,6 @@ set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
  
- include("cmake/platform.cmake")
+ include("cmake/utils.cmake")
+ include("cmake/options.cmake")
 -include("cmake/OpenMP.cmake")
+ include("cmake/TBB.cmake")
+ include("cmake/platform.cmake")
  include("cmake/SDL.cmake")
- include("cmake/MKL.cmake")
- include("cmake/Doxygen.cmake")
 diff --git a/cmake/MKL.cmake b/cmake/MKL.cmake
-index 57acaab..ea1b092 100644
+index bb02059..ea1b092 100644
 --- a/cmake/MKL.cmake
 +++ b/cmake/MKL.cmake
-@@ -18,184 +18,14 @@
+@@ -18,258 +18,14 @@
  # \${CMAKE_CURRENT_SOURCE_DIR}/external
  #===============================================================================
  
@@ -322,15 +322,81 @@ index 57acaab..ea1b092 100644
 -endif()
 -set(MKL_cmake_included true)
 -
+-# set SKIP_THIS_MKL to true if given configuration is not supported
+-function(maybe_skip_this_mkl LIBNAME)
+-    # Optimism...
+-    set(SKIP_THIS_MKL False PARENT_SCOPE)
+-
+-    # Both mklml_intel and mklml_gnu are OpenMP based.
+-    # So in case of TBB link with Intel MKL (RT library) and either set:
+-    #   MKL_THREADING_LAYER=tbb
+-    # to make Intel MKL use TBB threading as well, or
+-    #   MKL_THREADING_LAYER=sequential
+-    # to make Intel MKL be sequential.
+-    if (MKLDNN_THREADING STREQUAL "TBB" AND LIBNAME MATCHES "mklml")
+-        set(SKIP_THIS_MKL True PARENT_SCOPE)
+-    endif()
+-
+-    # user doesn't want Intel MKL at all
+-    if (MKLDNN_USE_MKL STREQUAL "NONE")
+-        set(SKIP_THIS_MKL True PARENT_SCOPE)
+-    endif()
+-
+-    # user specifies Intel MKL-ML should be used
+-    if (MKLDNN_USE_MKL STREQUAL "ML")
+-        if (LIBNAME STREQUAL "mkl_rt")
+-            set(SKIP_THIS_MKL True PARENT_SCOPE)
+-        endif()
+-    endif()
+-
+-    # user specifies full Intel MKL should be used
+-    if (MKLDNN_USE_MKL MATCHES "FULL")
+-        if (LIBNAME MATCHES "mklml")
+-            set(SKIP_THIS_MKL True PARENT_SCOPE)
+-        endif()
+-    endif()
+-
+-    # avoid using Intel MKL-ML that is not compatible with compiler's OpenMP RT
+-    if (MKLDNN_THREADING STREQUAL "OMP:COMP")
+-        if ((LIBNAME STREQUAL "mklml_intel" OR LIBNAME STREQUAL "mklml")
+-                AND (NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel"))
+-            set(SKIP_THIS_MKL True PARENT_SCOPE)
+-        elseif (LIBNAME STREQUAL "mklml_gnu"
+-                AND (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+-            set(SKIP_THIS_MKL True PARENT_SCOPE)
+-        endif()
+-    elseif (MKLDNN_THREADING STREQUAL "OMP:INTEL")
+-       if (LIBNAME STREQUAL "mklml_gnu")
+-           set(SKIP_THIS_MKL True PARENT_SCOPE)
+-       endif()
+-    endif()
+-endfunction()
+-
 -function(detect_mkl LIBNAME)
 -    if(HAVE_MKL)
 -        return()
 -    endif()
 -
--    message(STATUS "Detecting Intel(R) MKL: trying \${LIBNAME}")
+-    maybe_skip_this_mkl(\${LIBNAME})
+-    set_if(SKIP_THIS_MKL MAYBE_SKIP_MSG "... skipped")
+-    message(STATUS "Detecting Intel(R) MKL: trying \${LIBNAME}${MAYBE_SKIP_MSG}")
+-
+-    if (SKIP_THIS_MKL)
+-        return()
+-    endif()
 -
 -    find_path(MKLINC mkl_cblas.h
 -        HINTS \${MKLROOT}/include \$ENV{MKLROOT}/include)
+-
+-    # skip full Intel MKL while looking for Intel MKL-ML
+-    if (MKLINC AND LIBNAME MATCHES "mklml")
+-        get_filename_component(__mklinc_root "\${MKLINC}" PATH)
+-        find_library(tmp_MKLLIB NAMES "mkl_rt"
+-            HINTS \${__mklinc_root}/lib/intel64)
+-        set_if(tmp_MKLLIB MKLINC "")
+-        unset(tmp_MKLLIB CACHE)
+-    endif()
+-
 -    if(NOT MKLINC)
 -        file(GLOB_RECURSE MKLINC
 -                \${CMAKE_CURRENT_SOURCE_DIR}/external/*/mkl_cblas.h)
@@ -341,14 +407,8 @@ index 57acaab..ea1b092 100644
 -            if(MKLINCLEN GREATER 1)
 -                list(SORT MKLINC)
 -                list(REVERSE MKLINC)
--                # message(STATUS "MKLINC found \${MKLINCLEN} files:")
--                # foreach(LOCN IN LISTS MKLINC)
--                #     message(STATUS "       \${LOCN}")
--                # endforeach()
 -                list(GET MKLINC 0 MKLINCLST)
 -                set(MKLINC "\${MKLINCLST}")
--                # message(WARNING "MKLINC guessing... \${MKLINC}.  "
--                #     "Please check that above dir has the desired mkl_cblas.h")
 -            endif()
 -            get_filename_component(MKLINC \${MKLINC} PATH)
 -        endif()
@@ -376,14 +436,6 @@ index 57acaab..ea1b092 100644
 -        if(NOT MKLDLL)
 -            return()
 -        endif()
--    endif()
--
--    if(UNIX AND LIBNAME MATCHES "mklml.*")
--        # Although MKL-ML depends on shared object functions such as dlopen and
--        # dladdr it is not linked against libdl. This causes link failures when
--        # MKL-DNN is build with the gold linker (e.g. -fuse-ld=gold).
--        list(APPEND EXTRA_LIBS dl)
--        set(EXTRA_LIBS "\${EXTRA_LIBS}" PARENT_SCOPE)
 -    endif()
 -
 -    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
@@ -441,7 +493,7 @@ index 57acaab..ea1b092 100644
 -    if(WIN32)
 -        # Add paths to DLL to %PATH% on Windows
 -        get_filename_component(MKLDLLPATH "\${MKLDLL}" PATH)
--        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\;\${MKLDLLPATH}")
+-        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\\;\${MKLDLLPATH}")
 -        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}" PARENT_SCOPE)
 -    endif()
 -
@@ -449,21 +501,45 @@ index 57acaab..ea1b092 100644
 -    set(HAVE_MKL TRUE PARENT_SCOPE)
 -    set(MKLINC \${MKLINC} PARENT_SCOPE)
 -    set(MKLLIB "\${MKLLIB}" PARENT_SCOPE)
+-    set(MKLDLL "\${MKLDLL}" PARENT_SCOPE)
 -
--    if(WIN32)
--        set(MKLDLL "\${MKLDLL}" PARENT_SCOPE)
+-    set(MKLIOMP5LIB "\${MKLIOMP5LIB}" PARENT_SCOPE)
+-    set(MKLIOMP5DLL "\${MKLIOMP5DLL}" PARENT_SCOPE)
+-endfunction()
+-
+-function(set_static_mkl_libs libpath)
+-    set_ternary(lib WIN32 "" "lib")
+-    set_ternary(a WIN32 ".lib" ".a")
+-
+-    if (MKLDNN_THREADING STREQUAL "TBB")
+-        set(thr_name "tbb_thread")
+-    elseif (MKLDNN_THREADING STREQUAL "OMP:COMP" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+-        set(thr_name "gnu_thread")
+-    else()
+-        set(thr_name "intel_thread")
 -    endif()
--    if(MKLIOMP5LIB)
--        set(MKLIOMP5LIB "\${MKLIOMP5LIB}" PARENT_SCOPE)
+-
+-    find_library(mkl_iface NAMES "\${lib}mkl_intel_lp64\${a}" HINTS \${libpath})
+-    find_library(mkl_thr   NAMES "\${lib}mkl_\${thr_name}\${a}" HINTS \${libpath})
+-    find_library(mkl_core  NAMES "\${lib}mkl_core\${a}" HINTS \${libpath})
+-
+-    set(MKLLIB "\${mkl_iface};\${mkl_thr};\${mkl_core}")
+-    if (UNIX AND NOT APPLE)
+-        list(APPEND MKLLIB "\${mkl_iface};\${mkl_thr};\${mkl_core}")
 -    endif()
--    if(WIN32 AND MKLIOMP5DLL)
--        set(MKLIOMP5DLL "\${MKLIOMP5DLL}" PARENT_SCOPE)
--    endif()
+-    set_if(UNIX MKLLIB "\${MKLLIB};m;dl")
+-    set(MKLLIB "\${MKLLIB}" PARENT_SCOPE)
 -endfunction()
 -
 -detect_mkl("mklml_intel")
+-detect_mkl("mklml_gnu")
 -detect_mkl("mklml")
 -detect_mkl("mkl_rt")
+-if (MKLDNN_USE_MKL STREQUAL "FULL:STATIC" AND HAVE_MKL)
+-    set(MKLDLL "")
+-    get_filename_component(MKLLIBPATH "\${MKLLIB}" PATH)
+-    set_static_mkl_libs(\${MKLLIBPATH})
+-endif ()
 -
 -if(HAVE_MKL)
 -    add_definitions(-DUSE_MKL -DUSE_CBLAS)
@@ -473,20 +549,18 @@ index 57acaab..ea1b092 100644
 -    set(MSG "Intel(R) MKL:")
 -    message(STATUS "\${MSG} include \${MKLINC}")
 -    message(STATUS "\${MSG} lib \${MKLLIB}")
--    if(MKLIOMP5LIB)
--        message(STATUS "\${MSG} OpenMP lib \${MKLIOMP5LIB}")
--    else()
--        message(STATUS "\${MSG} OpenMP lib provided by compiler")
--    endif()
--    if(WIN32)
+-    if(WIN32 AND MKLDLL)
 -        message(STATUS "\${MSG} dll \${MKLDLL}")
--        if(MKLIOMP5DLL)
--            message(STATUS "\${MSG} OpenMP dll \${MKLIOMP5DLL}")
--        else()
--            message(STATUS "\${MSG} OpenMP dll provided by compiler")
--        endif()
 -    endif()
 -else()
+-    if (MKLDNN_USE_MKL STREQUAL "NONE")
+-        return()
+-    endif()
+-
+-    if (NOT MKLDNN_USE_MKL STREQUAL "DEF")
+-        set(FAIL_WITHOUT_MKL True)
+-    endif()
+-
 -    if(DEFINED ENV{FAIL_WITHOUT_MKL} OR DEFINED FAIL_WITHOUT_MKL)
 -        set(SEVERITY "FATAL_ERROR")
 -    else()
@@ -510,19 +584,19 @@ index 57acaab..ea1b092 100644
 +set(MSG "Intel(R) MKL:")
 +message(STATUS "\${MSG} include \${MKLINC}")
 diff --git a/cmake/SDL.cmake b/cmake/SDL.cmake
-index d0daa32..87e9b77 100644
+index b494a0f..0a0f98c 100644
 --- a/cmake/SDL.cmake
 +++ b/cmake/SDL.cmake
 @@ -23,7 +23,7 @@ endif()
  set(SDL_cmake_included true)
  
- if(UNIX OR APPLE)
+ if(UNIX)
 -    set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")
 +    set(CMAKE_CCXX_FLAGS "-Wformat -Wformat-security")
      set(CMAKE_CXX_FLAGS_RELEASE "\${CMAKE_CXX_FLAGS_RELEASE} -D_FORTIFY_SOURCE=2")
      set(CMAKE_C_FLAGS_RELEASE "\${CMAKE_C_FLAGS_RELEASE} -D_FORTIFY_SOURCE=2")
      if("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-@@ -52,7 +52,6 @@ if(UNIX OR APPLE)
+@@ -52,7 +52,6 @@ if(UNIX)
          set(CMAKE_SHARED_LINKER_FLAGS "\${CMAKE_SHARED_LINKER_FLAGS} -Wl,-bind_at_load")
          set(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -Wl,-bind_at_load")
      else()
@@ -531,83 +605,18 @@ index d0daa32..87e9b77 100644
          set(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
      endif()
 diff --git a/cmake/platform.cmake b/cmake/platform.cmake
-index 44c5427..0e7ac8f 100644
+index 3597970..1049a93 100644
 --- a/cmake/platform.cmake
 +++ b/cmake/platform.cmake
-@@ -90,7 +90,7 @@ elseif(UNIX OR APPLE OR MINGW)
-             "\${CMAKE_CCXX_NOWARN_FLAGS} -Wno-pass-failed")
+@@ -108,7 +108,7 @@ elseif(UNIX OR MINGW)
+         endif()
      elseif("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
          if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
 -            set(DEF_ARCH_OPT_FLAGS "-march=native -mtune=native")
-+            set(DEF_ARCH_OPT_FLAGS "${mopts}")
++            set(DEF_ARCH_OPT_FLAGS "-march=native")
          endif()
-         if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
-             # suppress warning on assumptions made regarding overflow (#146)
-diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
-index df14b9d..96d345d 100644
---- a/examples/CMakeLists.txt
-+++ b/examples/CMakeLists.txt
-@@ -27,7 +27,7 @@ include_directories(\${CMAKE_SOURCE_DIR}/include)
- 
- add_executable(simple-net-c simple_net.c)
- set_property(TARGET simple-net-c PROPERTY C_STANDARD 99)
--target_link_libraries(simple-net-c \${LIB_NAME})
-+target_link_libraries(simple-net-c \${LIB_NAME} \${EXTRA_LIBS})
- add_test(simple-net-c simple-net-c)
- if(WIN32)
-     configure_file(\${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-@@ -37,7 +37,7 @@ endif()
- 
- add_executable(simple-net-cpp simple_net.cpp)
- set_property(TARGET simple-net-cpp PROPERTY CXX_STANDARD 11)
--target_link_libraries(simple-net-cpp \${LIB_NAME})
-+target_link_libraries(simple-net-cpp \${LIB_NAME} \${EXTRA_LIBS})
- add_test(simple-net-cpp simple-net-cpp)
- if(WIN32)
-     configure_file(\${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-@@ -50,7 +50,7 @@ set_property(TARGET simple-training-net-c PROPERTY C_STANDARD 99)
- if(WIN32)
- target_link_libraries(simple-training-net-c \${LIB_NAME})
- else()
--target_link_libraries(simple-training-net-c \${LIB_NAME} m)
-+target_link_libraries(simple-training-net-c \${LIB_NAME} \${EXTRA_LIBS} m)
- endif()
- add_test(simple-training-net-c simple-training-net-c)
- if(WIN32)
-@@ -64,7 +64,7 @@ set_property(TARGET simple-training-net-cpp PROPERTY CXX_STANDARD 11)
- if(WIN32)
- target_link_libraries(simple-training-net-cpp \${LIB_NAME})
- else()
--target_link_libraries(simple-training-net-cpp \${LIB_NAME} m)
-+target_link_libraries(simple-training-net-cpp \${LIB_NAME} \${EXTRA_LIBS} m)
- endif()
- add_test(simple-training-net-cpp simple-training-net-cpp)
- if(WIN32)
-@@ -75,7 +75,11 @@ endif()
- 
- add_executable(simple-net-int8-cpp simple_net_int8.cpp)
- set_property(TARGET simple-net-int8-cpp PROPERTY CXX_STANDARD 11)
-+if(WIN32)
- target_link_libraries(simple-net-int8-cpp \${LIB_NAME})
-+else()
-+target_link_libraries(simple-net-int8-cpp \${LIB_NAME} \${EXTRA_LIBS})
-+endif()
- add_test(simple-net-int8-cpp simple-net-int8-cpp)
- if(WIN32)
-     configure_file(\${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 593b080..7641bcb 100644
---- a/src/CMakeLists.txt
-+++ b/src/CMakeLists.txt
-@@ -69,7 +69,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-     endif()
- endif()
- 
--add_library(\${TARGET_NAME} SHARED \${HEADERS} \${SOURCES})
-+add_library(\${TARGET_NAME} STATIC \${HEADERS} \${SOURCES})
- #Add mkldnn.dll to execution PATH
- if(NOT(MINGW))
-     set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\;\${CMAKE_CURRENT_BINARY_DIR}/\${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
+         # suppress warning on assumptions made regarding overflow (#146)
+         append(CMAKE_CCXX_NOWARN_FLAGS "-Wno-strict-overflow")
 EOD
         rc=$?
         if [ $rc != 0 ]; then
@@ -618,7 +627,7 @@ EOD
         cd mkl-dnn
     fi
     mkdir -p build && cd build &&
-    cmake -DCMAKE_INSTALL_PREFIX=$prefix/intel/mkldnn -DCMAKE_BUILD_TYPE=Release .. &&
+    cmake -DCMAKE_INSTALL_PREFIX=$prefix/intel/mkldnn -DCMAKE_BUILD_TYPE=Release -DMKLDNN_LIBRARY_TYPE=STATIC .. &&
     make -j$(nproc) && sudo make install
     rc=$?
     if [ $rc != 0 ]; then
@@ -662,7 +671,7 @@ install_eigen() {
 
 install_protobuf() {
     if [ ! -d "protobuf" ]; then
-        git clone --depth=1 https://github.com/google/protobuf -b v3.6.1
+        git clone --depth=1 https://github.com/google/protobuf -b v3.6.1.3
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download protobuf.${NC}"
@@ -688,7 +697,7 @@ install_protobuf() {
 
 install_flatbuffers() {
     if [ ! -d "flatbuffers" ]; then
-        git clone --depth=1 https://github.com/google/flatbuffers -b v1.9.0
+        git clone --depth=1 https://github.com/google/flatbuffers -b v1.10.0
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download flatbuffers.${NC}"
@@ -858,7 +867,7 @@ install_bazel() {
 mkl_cxxflags="-DINTEL_MKL -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include"
 mkl_ldflags="-L${prefix}/intel/mkl/lib -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
 if [ -z "$mkldnn_version" ] ; then
-    mkl_cxxflags="${mkl_cxxflags} -DINTEL_MKL_ML"
+    mkl_cxxflags="${mkl_cxxflags} -DINTEL_MKL_ML_ONLY"
 else
     mkl_ldflags="-L${prefix}/intel/mkldnn/lib/ -lmkldnn ${mkl_ldflags}"
 fi
@@ -917,10 +926,10 @@ index 588e96c..6760415 100644
                        std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/contrib/lite/Makefile b/tensorflow/contrib/lite/Makefile
 new file mode 100644
-index 0000000..5904e24
+index 0000000..b8df52f
 --- /dev/null
 +++ b/tensorflow/contrib/lite/Makefile
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,72 @@
 +SHELL := /bin/bash
 +
 +MAKEFILE_DIR := \$(shell dirname \$(realpath \$(lastword \$(MAKEFILE_LIST))))
@@ -951,6 +960,8 @@ index 0000000..5904e24
 +
 +CORE_CC_ALL_SRCS := \$(wildcard tensorflow/contrib/lite/*.cc) \\
 +                    \$(wildcard tensorflow/contrib/lite/*.c) \\
++                    \$(wildcard tensorflow/contrib/lite/c/*.c) \\
++                    \$(wildcard tensorflow/contrib/lite/core/api/*.cc) \\
 +                    \$(wildcard tensorflow/contrib/lite/kernels/*.cc) \\
 +                    \$(wildcard tensorflow/contrib/lite/kernels/*.c) \\
 +                    \$(wildcard tensorflow/contrib/lite/kernels/internal/*.cc) \\
@@ -992,7 +1003,7 @@ index 0000000..5904e24
 +clean:
 +	rm -rf \$(MAKEFILE_DIR)/gen
 diff --git a/tensorflow/contrib/lite/interpreter.cc b/tensorflow/contrib/lite/interpreter.cc
-index 5ab53f4..aeced44 100644
+index 88e41ff..4bfe63a 100644
 --- a/tensorflow/contrib/lite/interpreter.cc
 +++ b/tensorflow/contrib/lite/interpreter.cc
 @@ -20,6 +20,8 @@ limitations under the License.
@@ -1002,23 +1013,23 @@ index 5ab53f4..aeced44 100644
 +#include <Eigen/Core>
 +
  #include "tensorflow/contrib/lite/arena_planner.h"
- #include "tensorflow/contrib/lite/context.h"
+ #include "tensorflow/contrib/lite/c/c_api_internal.h"
  #include "tensorflow/contrib/lite/context_util.h"
 diff --git a/tensorflow/contrib/lite/kernels/register.cc b/tensorflow/contrib/lite/kernels/register.cc
-index 7b859dc..084d953 100644
+index 9402105..ce8ecd5 100644
 --- a/tensorflow/contrib/lite/kernels/register.cc
 +++ b/tensorflow/contrib/lite/kernels/register.cc
-@@ -245,8 +245,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
+@@ -253,8 +253,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
    // TODO(andrewharp, ahentz): Move these somewhere more appropriate so that
    // custom ops aren't always included by default.
    AddCustom("Mfcc", tflite::ops::custom::Register_MFCC());
 -  AddCustom("AudioSpectrogram",
 -            tflite::ops::custom::Register_AUDIO_SPECTROGRAM());
+   AddCustom("LayerNormLstm", tflite::ops::custom::Register_LAYER_NORM_LSTM());
+   AddCustom("Relu1", tflite::ops::custom::Register_RELU_1());
    AddCustom("TFLite_Detection_PostProcess",
-             tflite::ops::custom::Register_DETECTION_POSTPROCESS());
- }
 diff --git a/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h b/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
-index 81dd459..827d497 100644
+index 6879440..0e05fa2 100644
 --- a/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
 +++ b/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
 @@ -74,8 +74,12 @@ inline void* loadFunction(const char* name) {
@@ -1035,7 +1046,7 @@ index 81dd459..827d497 100644
  
  // NN api types based on NNAPI header file
 diff --git a/tensorflow/contrib/makefile/Makefile b/tensorflow/contrib/makefile/Makefile
-index d962a5e..83d5c89 100644
+index 36125c1..0f0c954 100644
 --- a/tensorflow/contrib/makefile/Makefile
 +++ b/tensorflow/contrib/makefile/Makefile
 @@ -81,17 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
@@ -1072,11 +1083,11 @@ index d962a5e..83d5c89 100644
  
  # If we're on Linux, also link in the dl library.
  ifeq (\$(HOST_OS),LINUX)
-@@ -176,30 +160,28 @@ PROTOGENDIR := \$(GENDIR)proto/
+@@ -177,30 +161,28 @@ PROTOGENDIR := \$(GENDIR)proto/
  DEPDIR := \$(GENDIR)dep/
  \$(shell mkdir -p \$(DEPDIR) >/dev/null)
  
-+BLAS?=${blas}
++BLAS?=MKL
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/MKL:=${mkl_cxxflags}
@@ -1117,7 +1128,7 @@ index d962a5e..83d5c89 100644
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
-@@ -207,12 +189,7 @@ endif
+@@ -208,12 +190,7 @@ endif
  # override local versions in the source tree.
  INCLUDES += -I/usr/local/include
  
@@ -1131,7 +1142,7 @@ index d962a5e..83d5c89 100644
  
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	PROTOC := \$(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc
-@@ -242,7 +219,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
+@@ -243,7 +220,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	LIBFLAGS += -L\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  	export LD_LIBRARY_PATH=\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  endif
@@ -1139,7 +1150,7 @@ index d962a5e..83d5c89 100644
  	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
  	LDFLAGS := -Wl,--no-whole-archive
  endif
-@@ -359,7 +335,7 @@ \$(MARCH_OPTION) \\
+@@ -360,7 +336,7 @@ \$(MARCH_OPTION) \\
  -I\$(PBTGENDIR)
  
  	LIBS := \\
@@ -1148,7 +1159,7 @@ index d962a5e..83d5c89 100644
  -lgnustl_static \\
  -lprotobuf \\
  -llog \\
-@@ -618,7 +594,6 @@ BENCHMARK_NAME := \$(BINDIR)benchmark
+@@ -619,7 +595,6 @@ BENCHMARK_NAME := \$(BINDIR)benchmark
  # gen_file_lists.sh script.
  
  CORE_CC_ALL_SRCS := \\
@@ -1156,7 +1167,7 @@ index d962a5e..83d5c89 100644
  \$(wildcard tensorflow/core/*.cc) \\
  \$(wildcard tensorflow/core/common_runtime/*.cc) \\
  \$(wildcard tensorflow/core/framework/*.cc) \\
-@@ -631,7 +606,6 @@ \$(wildcard tensorflow/core/platform/*/*.cc) \\
+@@ -632,7 +607,6 @@ \$(wildcard tensorflow/core/platform/*/*.cc) \\
  \$(wildcard tensorflow/core/platform/*/*/*.cc) \\
  \$(wildcard tensorflow/core/util/*.cc) \\
  \$(wildcard tensorflow/core/util/*/*.cc) \\
@@ -1164,7 +1175,7 @@ index d962a5e..83d5c89 100644
  tensorflow/core/util/version_info.cc
  # Remove duplicates (for version_info.cc)
  CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
-@@ -705,10 +679,189 @@ endif  # TEGRA
+@@ -706,10 +680,189 @@ endif  # TEGRA
  # Filter out all the excluded files.
  TF_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
  # Add in any extra files that don't fit the patterns easily
@@ -1357,7 +1368,7 @@ index d962a5e..83d5c89 100644
  PBT_CC_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_pb_text_files.txt)
  PROTO_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_proto_files.txt)
  BENCHMARK_SRCS := \\
-@@ -737,15 +890,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
+@@ -738,15 +891,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
  PROTO_OBJS := \$(addprefix \$(OBJDIR), \$(PROTO_SRCS:.proto=.pb.o))
  LIB_OBJS := \$(PROTO_OBJS) \$(TF_CC_OBJS) \$(PBT_OBJS)
  BENCHMARK_OBJS := \$(addprefix \$(OBJDIR), \$(BENCHMARK_SRCS:.cc=.o))
@@ -1383,7 +1394,7 @@ index d962a5e..83d5c89 100644
  .phony_version_info:
  tensorflow/core/util/version_info.cc: .phony_version_info
  	tensorflow/tools/git/gen_git_source.sh \$@
-@@ -761,6 +922,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
+@@ -762,6 +923,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
  	-o \$(BENCHMARK_NAME) \$(BENCHMARK_OBJS) \\
  	\$(LIBFLAGS) \$(TEGRA_LIBS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS) \$(CUDA_LIBS)
  
@@ -1401,31 +1412,31 @@ index d962a5e..83d5c89 100644
  ifeq (\$(BUILD_FOR_TEGRA),1)
  \$(OBJDIR)%.cu.o: %.cu.cc
 diff --git a/tensorflow/core/grappler/clusters/utils.cc b/tensorflow/core/grappler/clusters/utils.cc
-index a751972..39bc657 100644
+index 567e7c0..434d034 100644
 --- a/tensorflow/core/grappler/clusters/utils.cc
 +++ b/tensorflow/core/grappler/clusters/utils.cc
-@@ -119,19 +119,6 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
+@@ -120,19 +120,6 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
  
    if (device.type == "CPU") {
      return GetLocalCPUInfo();
 -  } else if (device.type == "GPU") {
 -    if (device.has_id) {
 -      TfGpuId tf_gpu_id(device.id);
--      CudaGpuId cuda_gpu_id;
--      Status s = GpuIdManager::TfToCudaGpuId(tf_gpu_id, &cuda_gpu_id);
+-      PlatformGpuId platform_gpu_id;
+-      Status s = GpuIdManager::TfToPlatformGpuId(tf_gpu_id, &platform_gpu_id);
 -      if (!s.ok()) {
 -        LOG(ERROR) << s;
 -        return unknown;
 -      }
--      return GetLocalGPUInfo(cuda_gpu_id);
+-      return GetLocalGPUInfo(platform_gpu_id);
 -    } else {
--      return GetLocalGPUInfo(CudaGpuId(0));
+-      return GetLocalGPUInfo(PlatformGpuId(0));
 -    }
    }
    return unknown;
  }
 diff --git a/tensorflow/core/grappler/costs/utils.cc b/tensorflow/core/grappler/costs/utils.cc
-index aad00ce..76e2891 100644
+index 5415324..d40ed73 100644
 --- a/tensorflow/core/grappler/costs/utils.cc
 +++ b/tensorflow/core/grappler/costs/utils.cc
 @@ -207,16 +207,7 @@ DeviceProperties GetDeviceInfo(const string& device_str) {
@@ -1434,13 +1445,13 @@ index aad00ce..76e2891 100644
    if (DeviceNameUtils::ParseFullName(device_str, &parsed)) {
 -    if (parsed.type == "GPU") {
 -      TfGpuId tf_gpu_id(parsed.id);
--      CudaGpuId cuda_gpu_id;
--      Status s = GpuIdManager::TfToCudaGpuId(tf_gpu_id, &cuda_gpu_id);
+-      PlatformGpuId platform_gpu_id;
+-      Status s = GpuIdManager::TfToPlatformGpuId(tf_gpu_id, &platform_gpu_id);
 -      if (!s.ok()) {
 -        // We are probably running simulation without linking cuda libraries.
--        cuda_gpu_id = CudaGpuId(parsed.id);
+-        platform_gpu_id = PlatformGpuId(parsed.id);
 -      }
--      return GetLocalGPUInfo(cuda_gpu_id);
+-      return GetLocalGPUInfo(platform_gpu_id);
 -    } else if (parsed.type == "CPU") {
 +    if (parsed.type == "CPU") {
        return GetLocalCPUInfo();
@@ -1645,7 +1656,7 @@ index 93a7537..6bdc871 100644
 +
  }  // namespace tensorflow
 diff --git a/tensorflow/core/ops/math_ops.cc b/tensorflow/core/ops/math_ops.cc
-index 717263a..ca67cae 100644
+index 3eff728..87ed122 100644
 --- a/tensorflow/core/ops/math_ops.cc
 +++ b/tensorflow/core/ops/math_ops.cc
 @@ -260,6 +260,28 @@ expected to create these operators.
@@ -1678,10 +1689,10 @@ index 717263a..ca67cae 100644
      .Input("x: T")
      .Output("y: bool")
 diff --git a/tensorflow/core/ops/nn_ops.cc b/tensorflow/core/ops/nn_ops.cc
-index 2485fa4..58c4db8 100644
+index d1d81b2..2bbe227 100644
 --- a/tensorflow/core/ops/nn_ops.cc
 +++ b/tensorflow/core/ops/nn_ops.cc
-@@ -1059,6 +1059,50 @@ REGISTER_OP("LogSoftmax")
+@@ -1057,6 +1057,50 @@ REGISTER_OP("LogSoftmax")
  
  // --------------------------------------------------------------------------
  
@@ -1732,6 +1743,22 @@ index 2485fa4..58c4db8 100644
  REGISTER_OP("SoftmaxCrossEntropyWithLogits")
      .Input("features: T")
      .Input("labels: T")
+diff --git a/tensorflow/core/util/mkl_util.h b/tensorflow/core/util/mkl_util.h
+index 04aaea4..dfd8ea5 100644
+--- a/tensorflow/core/util/mkl_util.h
++++ b/tensorflow/core/util/mkl_util.h
+@@ -33,11 +33,6 @@ limitations under the License.
+ #error "at most one of INTEL_MKL_ML_ONLY and INTEL_MKL_DNN_ONLY may be defined"
+ #endif
+ 
+-#ifdef INTEL_MKL_ML_ONLY
+-#error \\
+-    "Compiling for INTEL MKL ML only is no longer supported.Please use MKL DNN (the default option for --config=mkl)"
+-#endif
+-
+ #ifdef INTEL_MKL_ML_ONLY
+ #include "mkl_dnn.h"
+ #include "mkl_dnn_types.h"
 EOD
         rc=$?
         if [ $rc != 0 ]; then

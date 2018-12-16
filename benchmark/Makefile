@@ -90,13 +90,13 @@ run_classify: $(BIN)/classify \
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/classify
 
 run_obj_detect: run_obj_detect_ssd_mobilenet_v1_coco_2017_11_17 \
-                run_obj_detect_ssd_mobilenet_v2_coco_2018_05_09 \
+                run_obj_detect_ssd_mobilenet_v2_coco_2018_03_29 \
                 run_obj_detect_ssdlite_mobilenet_v2_coco_2018_05_09 \
                 run_obj_detect_ssd_mobilenet_v1_fpn_shared_box_predictor_640x640_coco14_sync_2018_07_03 \
                 run_obj_detect_ssdlite_mobilenet_v2_coco10
 
 OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v1_coco_2017_11_17=coco_labels.txt
-OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v2_coco_2018_05_09=coco_labels.txt
+OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v2_coco_2018_03_29=coco_labels.txt
 OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_coco_2018_05_09=coco_labels.txt
 OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v1_fpn_shared_box_predictor_640x640_coco14_sync_2018_07_03=coco_labels.txt
 OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_coco10=coco10_labels.txt
@@ -127,7 +127,7 @@ train_mnist: $(BIN)/mnist \
 	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/mnist -data_dir=$(TESTDATA)/mnist_data
 
 PREFIX?=/usr/local
-BLAS?=
+BLAS?=MKL
 USE_MKLDNN?=
 BLAS_CXXFLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 BLAS_CXXFLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
@@ -138,6 +138,8 @@ BLAS_LDFLAGS/OpenBLAS:=-L$(PREFIX)/OpenBLAS/lib -Wl,-Bstatic -lopenblas -lgfortr
 BLAS_LDFLAGS/MKL:=-L$(PREFIX)/intel/mkl/lib -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group
 ifneq ($(USE_MKLDNN),)
 	BLAS_LDFLAGS/MKL:=-L$(PREFIX)/intel/mkldnn/lib -lmkldnn $(BLAS_LDFLAGS/MKL)
+else
+	BLAS_CXXFLAGS/MKL += -DINTEL_MKL_ML_ONLY
 endif
 
 CXXFLAGS:=-g -O3 -pthread -std=c++11 -DNDEBUG -D_POSIX_C_SOURCE=200809L -D_FILE_OFFSET_BITS=64 \

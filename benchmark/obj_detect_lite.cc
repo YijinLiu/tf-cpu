@@ -385,4 +385,7 @@ int main(int argc, char** argv) {
 /*
 1. Intel(R) Core(TM) i3-4130 CPU @ 3.40GHz
 beach.ssdlite_mobilenet_v2_coco10_lite.mkv: 290 300x300 frames processed in 14515 ms(50 mspf).
+
+2. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
+beach.ssdlite_mobilenet_v2_coco10_lite.mkv: 290 300x300 frames processed in 10177 ms(35 mspf).
 */

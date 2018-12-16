@@ -339,4 +339,34 @@ BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              393 ms         
 BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              269 ms         49 ms         24 correct=192 frames=384 ms=6.285k wrong=192
 BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              190 ms         43 ms         34 correct=238 frames=544 ms=6.225k wrong=306
 BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time               118 ms         39 ms         49 correct=98 frames=784 ms=5.376k wrong=686
+
+2. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
+BM_Mobilenet_v1_1_0_224_quant/min_time:5.000/manual_time         511 ms         52 ms         13 correct=91 frames=208 ms=6.546k wrong=117
+BM_Mobilenet_v1_1_0_192_quant/min_time:5.000/manual_time         381 ms         49 ms         18 correct=162 frames=288 ms=6.627k wrong=126
+BM_Mobilenet_v1_1_0_160_quant/min_time:5.000/manual_time         273 ms         43 ms         25 correct=175 frames=400 ms=6.714k wrong=225
+BM_Mobilenet_v1_1_0_128_quant/min_time:5.000/manual_time         186 ms         37 ms         34 correct=238 frames=544 ms=6.285k wrong=306
+BM_Mobilenet_v1_0_75_224_quant/min_time:5.000/manual_time        353 ms         37 ms         19 correct=152 frames=304 ms=6.537k wrong=152
+BM_Mobilenet_v1_0_75_192_quant/min_time:5.000/manual_time        262 ms         39 ms         26 correct=208 frames=416 ms=6.771k wrong=208
+BM_Mobilenet_v1_0_75_160_quant/min_time:5.000/manual_time        187 ms         35 ms         35 correct=245 frames=560 ms=6.312k wrong=315
+BM_Mobilenet_v1_0_75_128_quant/min_time:5.000/manual_time        124 ms         31 ms         51 correct=357 frames=816 ms=5.865k wrong=459
+BM_Mobilenet_v1_1_0_224/min_time:5.000/manual_time               525 ms         50 ms         13 correct=91 frames=208 ms=6.721k wrong=117
+BM_Mobilenet_v1_1_0_192/min_time:5.000/manual_time               394 ms         51 ms         17 correct=153 frames=272 ms=6.55k wrong=119
+BM_Mobilenet_v1_1_0_160/min_time:5.000/manual_time               283 ms         43 ms         24 correct=192 frames=384 ms=6.446k wrong=192
+BM_Mobilenet_v1_1_0_128/min_time:5.000/manual_time               191 ms         37 ms         33 correct=231 frames=528 ms=6.104k wrong=297
+BM_Mobilenet_v1_0_75_224/min_time:5.000/manual_time              364 ms         37 ms         19 correct=152 frames=304 ms=6.854k wrong=152
+BM_Mobilenet_v1_0_75_192/min_time:5.000/manual_time              271 ms         40 ms         25 correct=200 frames=400 ms=6.565k wrong=200
+BM_Mobilenet_v1_0_75_160/min_time:5.000/manual_time              193 ms         35 ms         34 correct=238 frames=544 ms=6.15k wrong=306
+BM_Mobilenet_v1_0_75_128/min_time:5.000/manual_time              128 ms         31 ms         50 correct=250 frames=800 ms=5.768k wrong=550
+BM_Mobilenet_v2_1_4_224/min_time:5.000/manual_time               678 ms         62 ms         10 correct=80 frames=160 ms=6.739k wrong=80
+BM_Mobilenet_v2_1_3_224/min_time:5.000/manual_time               631 ms         65 ms          8 correct=64 frames=128 ms=5.029k wrong=64
+BM_Mobilenet_v2_1_0_224/min_time:5.000/manual_time               444 ms         42 ms         16 correct=96 frames=256 ms=6.869k wrong=160
+BM_Mobilenet_v2_1_0_192/min_time:5.000/manual_time               330 ms         43 ms         21 correct=168 frames=336 ms=6.798k wrong=168
+BM_Mobilenet_v2_1_0_160/min_time:5.000/manual_time               237 ms         38 ms         28 correct=196 frames=448 ms=6.483k wrong=252
+BM_Mobilenet_v2_1_0_128/min_time:5.000/manual_time               158 ms         33 ms         40 correct=280 frames=640 ms=5.97k wrong=360
+BM_Mobilenet_v2_1_0_96/min_time:5.000/manual_time                 98 ms         30 ms         61 correct=366 frames=976 ms=5.11k wrong=610
+BM_Mobilenet_v2_0_75_224/min_time:5.000/manual_time              368 ms         37 ms         19 correct=133 frames=304 ms=6.851k wrong=171
+BM_Mobilenet_v2_0_75_192/min_time:5.000/manual_time              273 ms         40 ms         25 correct=175 frames=400 ms=6.562k wrong=225
+BM_Mobilenet_v2_0_75_160/min_time:5.000/manual_time              194 ms         35 ms         34 correct=272 frames=544 ms=6.149k wrong=272
+BM_Mobilenet_v2_0_75_128/min_time:5.000/manual_time              129 ms         31 ms         49 correct=343 frames=784 ms=5.655k wrong=441
+BM_Mobilenet_v2_0_75_96/min_time:5.000/manual_time                79 ms         29 ms         75 correct=150 frames=1.2k ms=4.963k wrong=1050
 */

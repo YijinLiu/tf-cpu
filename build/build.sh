@@ -20,7 +20,7 @@ version=1.12.0
 bazel_version=0.19.2
 prefix=/usr/local
 mopts="-march=native"
-mkldnn_version=0.17.1
+mkldnn_version=0.17.2
 
 OPTS=`getopt -n 'build.sh' -o b:,m:,p:,v: -l blas:,version:,bazel_version:,mkldnn_version:,prefix:,mopts: -- "$@"`
 rc=$?
@@ -298,7 +298,7 @@ install_mkldnn() {
         cd mkl-dnn
         patch -l -p1 <<- EOD
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index b79aea4..754c098 100644
+index a80af75..29f3a38 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -66,7 +66,6 @@ set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
@@ -379,7 +379,7 @@ index bb02059..ea1b092 100644
 -
 -    maybe_skip_this_mkl(\${LIBNAME})
 -    set_if(SKIP_THIS_MKL MAYBE_SKIP_MSG "... skipped")
--    message(STATUS "Detecting Intel(R) MKL: trying \${LIBNAME}${MAYBE_SKIP_MSG}")
+-    message(STATUS "Detecting Intel(R) MKL: trying \${LIBNAME}\${MAYBE_SKIP_MSG}")
 -
 -    if (SKIP_THIS_MKL)
 -        return()
@@ -493,7 +493,7 @@ index bb02059..ea1b092 100644
 -    if(WIN32)
 -        # Add paths to DLL to %PATH% on Windows
 -        get_filename_component(MKLDLLPATH "\${MKLDLL}" PATH)
--        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\\;\${MKLDLLPATH}")
+-        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\;\${MKLDLLPATH}")
 -        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}" PARENT_SCOPE)
 -    endif()
 -
@@ -613,7 +613,7 @@ index 3597970..1049a93 100644
      elseif("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
          if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
 -            set(DEF_ARCH_OPT_FLAGS "-march=native -mtune=native")
-+            set(DEF_ARCH_OPT_FLAGS "-march=native")
++            set(DEF_ARCH_OPT_FLAGS "${mopts}")
          endif()
          # suppress warning on assumptions made regarding overflow (#146)
          append(CMAKE_CCXX_NOWARN_FLAGS "-Wno-strict-overflow")

@@ -1,8 +1,9 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
+ENV DEBIAN_FRONTEND noninteractive
 RUN apt update && apt upgrade -y && \
-    apt install -y --no-install-recommends bash bash-completion ca-certificates dpkg pkg-config \
-        ssh sudo tzdata && \
+    apt install -qq -y --no-install-recommends \
+        bash bash-completion ca-certificates dpkg pkg-config ssh sudo tzdata && \
     echo America/Los_Angeles > /etc/timezone && \
     dpkg-reconfigure --frontend noninteractive tzdata
 

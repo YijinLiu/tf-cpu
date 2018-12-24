@@ -1,9 +1,9 @@
 WORK_DIR:=$(shell readlink -f $(dir $(lastword $(MAKEFILE_LIST))))
 
-VERSION?=1.12.0
+VERSION?=0a708f8da4afc5099cae1493dfb60a5680dadf2f
 BLAS?=MKL
 CPU?=native
-MKLDNN_VERSION?=0.17.1
+MKLDNN_VERSION?=0.17.2
 
 name_extra:=$(shell echo $(BLAS) | tr A-Z a-z)
 ifeq ($(BLAS),MKL)

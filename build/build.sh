@@ -16,7 +16,7 @@ usage() {
 }
 
 blas=MKL
-version=1.12.0
+version=0a708f8da4afc5099cae1493dfb60a5680dadf2f
 bazel_version=0.19.2
 prefix=/usr/local
 mopts="-march=native"
@@ -76,7 +76,7 @@ install_headers() {
 
 install_abseil_cpp() {
     # See tensorflow/workspace.bzl for the tag in use.
-    abseil_tag=48cd2c3f351ff188bc85684b84a91b6e6d17d896
+    abseil_tag=111ca7060a6ff50115ca85b59f6b5d8c8c5e9105
     if [ ! -d "abseil-cpp-${abseil_tag}" ]; then
         wget -O - https://github.com/abseil/abseil-cpp/archive/${abseil_tag}.tar.gz | tar xvzf -
         rc=$?
@@ -90,37 +90,34 @@ install_abseil_cpp() {
     cd build
     cmake .. && make &&
     ar -r libabsl.a \
-        absl/base/CMakeFiles/absl_dynamic_annotations.dir/dynamic_annotations.cc.o \
-        absl/base/CMakeFiles/absl_malloc_internal.dir/internal/low_level_alloc.cc.o \
-        absl/base/CMakeFiles/absl_throw_delegate.dir/internal/throw_delegate.cc.o \
-        absl/base/CMakeFiles/absl_spinlock_wait.dir/internal/spinlock_wait.cc.o \
         absl/base/CMakeFiles/absl_base.dir/internal/cycleclock.cc.o \
         absl/base/CMakeFiles/absl_base.dir/internal/raw_logging.cc.o \
         absl/base/CMakeFiles/absl_base.dir/internal/spinlock.cc.o \
         absl/base/CMakeFiles/absl_base.dir/internal/sysinfo.cc.o \
         absl/base/CMakeFiles/absl_base.dir/internal/thread_identity.cc.o \
         absl/base/CMakeFiles/absl_base.dir/internal/unscaledcycleclock.cc.o \
-        absl/base/CMakeFiles/absl_base.dir/internal/low_level_alloc.cc.o \
-        absl/container/CMakeFiles/test_instance_tracker_lib.dir/internal/test_instance_tracker.cc.o \
-        absl/debugging/CMakeFiles/absl_stack_consumption.dir/internal/stack_consumption.cc.o \
+        absl/base/CMakeFiles/absl_dynamic_annotations.dir/dynamic_annotations.cc.o \
+        absl/base/CMakeFiles/absl_internal_spinlock_wait.dir/internal/spinlock_wait.cc.o \
+        absl/base/CMakeFiles/absl_internal_throw_delegate.dir/internal/throw_delegate.cc.o \
         absl/debugging/CMakeFiles/absl_stacktrace.dir/stacktrace.cc.o \
-        absl/debugging/CMakeFiles/absl_stacktrace.dir/internal/address_is_readable.cc.o \
-        absl/debugging/CMakeFiles/absl_stacktrace.dir/internal/elf_mem_image.cc.o \
-        absl/debugging/CMakeFiles/absl_stacktrace.dir/internal/vdso_support.cc.o \
         absl/debugging/CMakeFiles/absl_leak_check.dir/leak_check.cc.o \
         absl/debugging/CMakeFiles/absl_symbolize.dir/symbolize.cc.o \
-        absl/debugging/CMakeFiles/absl_symbolize.dir/internal/demangle.cc.o \
-        absl/debugging/CMakeFiles/absl_symbolize.dir/internal/address_is_readable.cc.o \
-        absl/debugging/CMakeFiles/absl_symbolize.dir/internal/elf_mem_image.cc.o \
-        absl/debugging/CMakeFiles/absl_symbolize.dir/internal/vdso_support.cc.o \
+        absl/hash/CMakeFiles/absl_hash.dir/internal/hash.cc.o \
+        absl/hash/CMakeFiles/absl_internal_city.dir/internal/city.cc.o \
+        absl/numeric/CMakeFiles/absl_int128.dir/int128.cc.o \
+        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/arg.cc.o \
+        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/bind.cc.o \
+        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/extension.cc.o \
+        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/float_conversion.cc.o \
+        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/output.cc.o \
+        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/parser.cc.o \
+        absl/strings/CMakeFiles/absl_internal_strings_internal.dir/internal/utf8.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/ascii.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/charconv.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/escaping.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/internal/charconv_bigint.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/internal/charconv_parse.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/internal/memutil.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/internal/utf8.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/internal/ostringstream.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/match.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/numbers.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/str_cat.cc.o \
@@ -128,42 +125,19 @@ install_abseil_cpp() {
         absl/strings/CMakeFiles/absl_strings.dir/str_split.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/string_view.cc.o \
         absl/strings/CMakeFiles/absl_strings.dir/substitute.cc.o \
-        absl/numeric/CMakeFiles/absl_int128.dir/int128.cc.o \
         absl/time/CMakeFiles/absl_time.dir/time.cc.o \
         absl/time/CMakeFiles/absl_time.dir/clock.cc.o \
         absl/time/CMakeFiles/absl_time.dir/duration.cc.o \
         absl/time/CMakeFiles/absl_time.dir/format.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/civil_time_detail.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_fixed.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_format.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_if.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_impl.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_info.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_libc.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_lookup.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/time_zone_posix.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/internal/cctz/src/zone_info_source.cc.o \
-        absl/debugging/CMakeFiles/absl_examine_stack.dir/internal/examine_stack.cc.o \
         absl/synchronization/CMakeFiles/absl_synchronization.dir/barrier.cc.o \
         absl/synchronization/CMakeFiles/absl_synchronization.dir/blocking_counter.cc.o \
         absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/create_thread_identity.cc.o \
         absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/per_thread_sem.cc.o \
         absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/waiter.cc.o \
-        absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/graphcycles.cc.o \
         absl/synchronization/CMakeFiles/absl_synchronization.dir/notification.cc.o \
         absl/synchronization/CMakeFiles/absl_synchronization.dir/mutex.cc.o \
         absl/debugging/CMakeFiles/absl_failure_signal_handler.dir/failure_signal_handler.cc.o \
-        absl/strings/CMakeFiles/str_format_extension_internal.dir/internal/str_format/extension.cc.o \
-        absl/strings/CMakeFiles/str_format_extension_internal.dir/internal/str_format/output.cc.o \
-        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/arg.cc.o \
-        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/bind.cc.o \
-        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/extension.cc.o \
-        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/float_conversion.cc.o \
-        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/output.cc.o \
-        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/parser.cc.o \
-        absl/types/CMakeFiles/absl_variant.dir/bad_variant_access.cc.o \
         absl/types/CMakeFiles/absl_bad_optional_access.dir/bad_optional_access.cc.o \
-        absl/types/CMakeFiles/absl_bad_any_cast.dir/bad_any_cast.cc.o \
         absl/types/CMakeFiles/absl_optional.dir/optional.cc.o
     rc=$?
     if [ $rc != 0 ]; then
@@ -648,7 +622,7 @@ install_blas() {
 
 install_eigen() {
     # See tensorflow/workspace.bzl for what's the version used by tensorflow.
-    eigen_tag=fd6845384b86
+    eigen_tag=9f48e814419e
     if [ ! -d "eigen-eigen-$eigen_tag" ]; then
         wget -O - https://bitbucket.org/eigen/eigen/get/${eigen_tag}.tar.gz | tar xzvf -
         rc=$?
@@ -864,7 +838,7 @@ install_bazel() {
     fi
 }
 
-mkl_cxxflags="-DINTEL_MKL -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include"
+mkl_cxxflags="-DENABLE_MKL -DINTEL_MKL -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include"
 mkl_ldflags="-L${prefix}/intel/mkl/lib -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
 if [ -z "$mkldnn_version" ] ; then
     mkl_cxxflags="${mkl_cxxflags} -DINTEL_MKL_ML_ONLY"
@@ -874,7 +848,12 @@ fi
 
 install_tensorflow() {
     if [ ! -d tensorflow ] ; then
-        git clone --depth=1 https://github.com/tensorflow/tensorflow -b v${version}
+        if [[ $version =~ ^[0-9a-f]+$ ]] ; then
+            git clone https://github.com/tensorflow/tensorflow &&
+            git reset $version --hard
+        else
+            git clone --depth=1 https://github.com/tensorflow/tensorflow -b v${version}
+        fi
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download TensorFlow source!${NC}"
@@ -904,7 +883,7 @@ index 1329b56..b65bf88 100644
                  const std::vector<Output>& grad_inputs,
                  std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/cc/gradients/nn_grad.cc b/tensorflow/cc/gradients/nn_grad.cc
-index 588e96c..6760415 100644
+index 2a32a2e..2768b20 100644
 --- a/tensorflow/cc/gradients/nn_grad.cc
 +++ b/tensorflow/cc/gradients/nn_grad.cc
 @@ -125,6 +125,16 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
@@ -924,129 +903,8 @@ index 588e96c..6760415 100644
  Status ReluGradHelper(const Scope& scope, const Operation& op,
                        const std::vector<Output>& grad_inputs,
                        std::vector<Output>* grad_outputs) {
-diff --git a/tensorflow/contrib/lite/Makefile b/tensorflow/contrib/lite/Makefile
-new file mode 100644
-index 0000000..b8df52f
---- /dev/null
-+++ b/tensorflow/contrib/lite/Makefile
-@@ -0,0 +1,72 @@
-+SHELL := /bin/bash
-+
-+MAKEFILE_DIR := \$(shell dirname \$(realpath \$(lastword \$(MAKEFILE_LIST))))
-+
-+OBJDIR := \$(MAKEFILE_DIR)/gen/obj/
-+BINDIR := \$(MAKEFILE_DIR)/gen/bin/
-+LIBDIR := \$(MAKEFILE_DIR)/gen/lib/
-+GENDIR := \$(MAKEFILE_DIR)/gen/obj/
-+
-+CC := gcc
-+CXX := g++
-+CCFLAGS := -O3 -DNDEBUG ${mopts} -DGEMMLOWP_ALLOW_SLOW_SCALAR_FALLBACK -pthread
-+CXXFLAGS := \$(CCFLAGS) --std=c++11 -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
-+INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I${prefix}/include -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
-+LIBS := -lfarmhash -lstdc++ -lpthread -lm -lz -ldl
-+
-+AR := ar
-+ARFLAGS := -r
-+
-+LIB_NAME := libtensorflow-lite.a
-+LIB_PATH := \$(LIBDIR)\$(LIB_NAME)
-+
-+MINIMAL_PATH := \$(BINDIR)minimal
-+MINIMAL_SRCS := tensorflow/contrib/lite/examples/minimal/minimal.cc
-+MINIMAL_OBJS := \$(addprefix \$(OBJDIR), \$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(MINIMAL_SRCS))))
-+
-+
-+
-+CORE_CC_ALL_SRCS := \$(wildcard tensorflow/contrib/lite/*.cc) \\
-+                    \$(wildcard tensorflow/contrib/lite/*.c) \\
-+                    \$(wildcard tensorflow/contrib/lite/c/*.c) \\
-+                    \$(wildcard tensorflow/contrib/lite/core/api/*.cc) \\
-+                    \$(wildcard tensorflow/contrib/lite/kernels/*.cc) \\
-+                    \$(wildcard tensorflow/contrib/lite/kernels/*.c) \\
-+                    \$(wildcard tensorflow/contrib/lite/kernels/internal/*.cc) \\
-+                    \$(wildcard tensorflow/contrib/lite/kernels/internal/*.c) \\
-+                    \$(wildcard tensorflow/contrib/lite/kernels/internal/optimized/*.cc) \\
-+                    \$(wildcard tensorflow/contrib/lite/kernels/internal/optimized/*.c) \\
-+                    \$(wildcard tensorflow/contrib/lite/kernels/internal/reference/*.cc) \\
-+                    \$(wildcard tensorflow/contrib/lite/kernels/internal/reference/*.c) \\
-+                    tensorflow/contrib/lite/profiling/time.cc
-+CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
-+CORE_CC_EXCLUDE_SRCS := \$(wildcard tensorflow/contrib/lite/*test.cc) \\
-+                        \$(wildcard tensorflow/contrib/lite/*/*test.cc) \\
-+                        \$(wildcard tensorflow/contrib/lite/*/*/*test.cc) \\
-+                        \$(wildcard tensorflow/contrib/lite/*/*/*/*test.cc) \\
-+                        tensorflow/contrib/lite/kernels/internal/spectrogram.cc \\
-+                        tensorflow/contrib/lite/kernels/test_util.cc
-+TF_LITE_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
-+TF_LITE_CC_OBJS := \$(addprefix \$(OBJDIR), \$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(TF_LITE_CC_SRCS))))
-+LIB_OBJS := \$(TF_LITE_CC_OBJS)
-+
-+\$(OBJDIR)%.o: %.cc
-+	@mkdir -p \$(dir \$@)
-+	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) -c \$< -o \$@
-+
-+\$(OBJDIR)%.o: %.c
-+	@mkdir -p \$(dir \$@)
-+	\$(CC) \$(CCFLAGS) \$(INCLUDES) -c \$< -o \$@
-+
-+all: \$(LIB_PATH) \$(MINIMAL_PATH)
-+
-+\$(LIB_PATH): \$(LIB_OBJS)
-+	@mkdir -p \$(dir \$@)
-+	\$(AR) \$(ARFLAGS) \$(LIB_PATH) \$(LIB_OBJS)
-+
-+\$(MINIMAL_PATH): \$(MINIMAL_OBJS) \$(LIB_PATH)
-+	@mkdir -p \$(dir \$@)
-+	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) -o \$(MINIMAL_PATH) \$(MINIMAL_OBJS) \$(LIBFLAGS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS)
-+
-+clean:
-+	rm -rf \$(MAKEFILE_DIR)/gen
-diff --git a/tensorflow/contrib/lite/interpreter.cc b/tensorflow/contrib/lite/interpreter.cc
-index 88e41ff..4bfe63a 100644
---- a/tensorflow/contrib/lite/interpreter.cc
-+++ b/tensorflow/contrib/lite/interpreter.cc
-@@ -20,6 +20,8 @@ limitations under the License.
- #include <cstdint>
- #include <cstring>
- 
-+#include <Eigen/Core>
-+
- #include "tensorflow/contrib/lite/arena_planner.h"
- #include "tensorflow/contrib/lite/c/c_api_internal.h"
- #include "tensorflow/contrib/lite/context_util.h"
-diff --git a/tensorflow/contrib/lite/kernels/register.cc b/tensorflow/contrib/lite/kernels/register.cc
-index 9402105..ce8ecd5 100644
---- a/tensorflow/contrib/lite/kernels/register.cc
-+++ b/tensorflow/contrib/lite/kernels/register.cc
-@@ -253,8 +253,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
-   // TODO(andrewharp, ahentz): Move these somewhere more appropriate so that
-   // custom ops aren't always included by default.
-   AddCustom("Mfcc", tflite::ops::custom::Register_MFCC());
--  AddCustom("AudioSpectrogram",
--            tflite::ops::custom::Register_AUDIO_SPECTROGRAM());
-   AddCustom("LayerNormLstm", tflite::ops::custom::Register_LAYER_NORM_LSTM());
-   AddCustom("Relu1", tflite::ops::custom::Register_RELU_1());
-   AddCustom("TFLite_Detection_PostProcess",
-diff --git a/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h b/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
-index 6879440..0e05fa2 100644
---- a/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
-+++ b/tensorflow/contrib/lite/nnapi/NeuralNetworksShim.h
-@@ -74,8 +74,12 @@ inline void* loadFunction(const char* name) {
- }
- 
- inline bool NNAPIExists() {
-+#ifdef __ANDROID__
-   static bool nnapi_is_available = getLibraryHandle();
-   return nnapi_is_available;
-+#else
-+  return false;
-+#endif
- }
- 
- // NN api types based on NNAPI header file
 diff --git a/tensorflow/contrib/makefile/Makefile b/tensorflow/contrib/makefile/Makefile
-index 36125c1..0f0c954 100644
+index 7ea6e34..c53bb55 100644
 --- a/tensorflow/contrib/makefile/Makefile
 +++ b/tensorflow/contrib/makefile/Makefile
 @@ -81,17 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
@@ -1102,8 +960,8 @@ index 36125c1..0f0c954 100644
 +OPTFLAGS := -O3 \$(BLAS_CXX_FLAGS/\$(BLAS)) -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
  
  ifneq (\$(TARGET),ANDROID)
--   OPTFLAGS += -march=native
-+   OPTFLAGS += $mopts
+-  OPTFLAGS += -march=native
++  OPTFLAGS += ${mopts}
  endif
  
 -CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG \$(OPTFLAGS)
@@ -1128,9 +986,9 @@ index 36125c1..0f0c954 100644
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
-@@ -208,12 +190,7 @@ endif
- # override local versions in the source tree.
- INCLUDES += -I/usr/local/include
+@@ -218,12 +200,7 @@ ifeq (\$(WITH_TFLITE_FLEX), true)
+ 	INCLUDES += -I\$(MAKEFILE_DIR)/downloads/flatbuffers/include
+ endif
  
 -LIBS := \\
 -\$(TARGET_NSYNC_LIB) \\
@@ -1142,7 +1000,7 @@ index 36125c1..0f0c954 100644
  
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	PROTOC := \$(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc
-@@ -243,7 +220,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
+@@ -253,7 +230,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	LIBFLAGS += -L\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  	export LD_LIBRARY_PATH=\$(MAKEFILE_DIR)/gen/protobuf-host/lib
  endif
@@ -1150,7 +1008,7 @@ index 36125c1..0f0c954 100644
  	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
  	LDFLAGS := -Wl,--no-whole-archive
  endif
-@@ -360,7 +336,7 @@ \$(MARCH_OPTION) \\
+@@ -370,7 +346,7 @@ \$(MARCH_OPTION) \\
  -I\$(PBTGENDIR)
  
  	LIBS := \\
@@ -1159,7 +1017,7 @@ index 36125c1..0f0c954 100644
  -lgnustl_static \\
  -lprotobuf \\
  -llog \\
-@@ -619,7 +595,6 @@ BENCHMARK_NAME := \$(BINDIR)benchmark
+@@ -629,7 +605,6 @@ BENCHMARK_NAME := \$(BINDIR)benchmark
  # gen_file_lists.sh script.
  
  CORE_CC_ALL_SRCS := \\
@@ -1167,7 +1025,7 @@ index 36125c1..0f0c954 100644
  \$(wildcard tensorflow/core/*.cc) \\
  \$(wildcard tensorflow/core/common_runtime/*.cc) \\
  \$(wildcard tensorflow/core/framework/*.cc) \\
-@@ -632,7 +607,6 @@ \$(wildcard tensorflow/core/platform/*/*.cc) \\
+@@ -642,7 +617,6 @@ \$(wildcard tensorflow/core/platform/*/*.cc) \\
  \$(wildcard tensorflow/core/platform/*/*/*.cc) \\
  \$(wildcard tensorflow/core/util/*.cc) \\
  \$(wildcard tensorflow/core/util/*/*.cc) \\
@@ -1175,7 +1033,7 @@ index 36125c1..0f0c954 100644
  tensorflow/core/util/version_info.cc
  # Remove duplicates (for version_info.cc)
  CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
-@@ -706,10 +680,189 @@ endif  # TEGRA
+@@ -716,10 +690,191 @@ endif  # TEGRA
  # Filter out all the excluded files.
  TF_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
  # Add in any extra files that don't fit the patterns easily
@@ -1234,6 +1092,7 @@ index 36125c1..0f0c954 100644
 +              tensorflow/core/kernels/cwise_op_sqrt.cc \\
 +              tensorflow/core/kernels/cwise_op_sub.cc \\
 +              tensorflow/core/kernels/control_flow_ops.cc \\
++              tensorflow/core/kernels/conv_ops_fused.cc \\
 +              tensorflow/core/kernels/deep_conv2d.cc \\
 +              tensorflow/core/kernels/dense_update_ops.cc \\
 +              tensorflow/core/kernels/depthwise_conv_op.cc \\
@@ -1252,7 +1111,6 @@ index 36125c1..0f0c954 100644
 +              tensorflow/core/kernels/non_max_suppression_op.cc \\
 +              tensorflow/core/kernels/no_op.cc \\
 +              tensorflow/core/kernels/one_hot_op.cc \\
-+              tensorflow/core/kernels/ops_util.cc \\
 +              tensorflow/core/kernels/pack_op.cc \\
 +              tensorflow/core/kernels/pad_op.cc \\
 +              tensorflow/core/kernels/parameterized_truncated_normal_op.cc \\
@@ -1314,11 +1172,13 @@ index 36125c1..0f0c954 100644
 +              tensorflow/core/ops/array_ops.cc \\
 +              tensorflow/core/ops/control_flow_ops.cc \\
 +              tensorflow/core/ops/data_flow_ops.cc \\
++              tensorflow/core/ops/dataset_ops.cc \\
 +              tensorflow/core/ops/function_ops.cc \\
 +              tensorflow/core/ops/functional_ops.cc \\
 +              tensorflow/core/ops/image_ops.cc \\
 +              tensorflow/core/ops/logging_ops.cc \\
 +              tensorflow/core/ops/math_ops.cc \\
++              tensorflow/core/ops/mkl_nn_ops.cc \\
 +              tensorflow/core/ops/nn_ops.cc \\
 +              tensorflow/core/ops/no_op.cc \\
 +              tensorflow/core/ops/random_ops.cc \\
@@ -1368,7 +1228,7 @@ index 36125c1..0f0c954 100644
  PBT_CC_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_pb_text_files.txt)
  PROTO_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_proto_files.txt)
  BENCHMARK_SRCS := \\
-@@ -738,15 +891,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
+@@ -799,15 +954,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
  PROTO_OBJS := \$(addprefix \$(OBJDIR), \$(PROTO_SRCS:.proto=.pb.o))
  LIB_OBJS := \$(PROTO_OBJS) \$(TF_CC_OBJS) \$(PBT_OBJS)
  BENCHMARK_OBJS := \$(addprefix \$(OBJDIR), \$(BENCHMARK_SRCS:.cc=.o))
@@ -1394,7 +1254,7 @@ index 36125c1..0f0c954 100644
  .phony_version_info:
  tensorflow/core/util/version_info.cc: .phony_version_info
  	tensorflow/tools/git/gen_git_source.sh \$@
-@@ -762,6 +923,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
+@@ -823,6 +986,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
  	-o \$(BENCHMARK_NAME) \$(BENCHMARK_OBJS) \\
  	\$(LIBFLAGS) \$(TEGRA_LIBS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS) \$(CUDA_LIBS)
  
@@ -1436,10 +1296,10 @@ index 567e7c0..434d034 100644
    return unknown;
  }
 diff --git a/tensorflow/core/grappler/costs/utils.cc b/tensorflow/core/grappler/costs/utils.cc
-index 5415324..d40ed73 100644
+index d45bb14..e59c8c0 100644
 --- a/tensorflow/core/grappler/costs/utils.cc
 +++ b/tensorflow/core/grappler/costs/utils.cc
-@@ -207,16 +207,7 @@ DeviceProperties GetDeviceInfo(const string& device_str) {
+@@ -239,16 +239,7 @@ DeviceProperties GetDeviceInfo(const string& device_str) {
  
    DeviceNameUtils::ParsedName parsed;
    if (DeviceNameUtils::ParseFullName(device_str, &parsed)) {
@@ -1656,10 +1516,10 @@ index 93a7537..6bdc871 100644
 +
  }  // namespace tensorflow
 diff --git a/tensorflow/core/ops/math_ops.cc b/tensorflow/core/ops/math_ops.cc
-index 3eff728..87ed122 100644
+index 6f261dc..1e31ee8 100644
 --- a/tensorflow/core/ops/math_ops.cc
 +++ b/tensorflow/core/ops/math_ops.cc
-@@ -260,6 +260,28 @@ expected to create these operators.
+@@ -262,6 +262,28 @@ expected to create these operators.
  #undef UNARY_REAL
  #undef UNARY_COMPLEX
  
@@ -1689,10 +1549,10 @@ index 3eff728..87ed122 100644
      .Input("x: T")
      .Output("y: bool")
 diff --git a/tensorflow/core/ops/nn_ops.cc b/tensorflow/core/ops/nn_ops.cc
-index d1d81b2..2bbe227 100644
+index ee528c7..0ed9f39 100644
 --- a/tensorflow/core/ops/nn_ops.cc
 +++ b/tensorflow/core/ops/nn_ops.cc
-@@ -1057,6 +1057,50 @@ REGISTER_OP("LogSoftmax")
+@@ -1093,6 +1093,50 @@ REGISTER_OP("LogSoftmax")
  
  // --------------------------------------------------------------------------
  
@@ -1744,7 +1604,7 @@ index d1d81b2..2bbe227 100644
      .Input("features: T")
      .Input("labels: T")
 diff --git a/tensorflow/core/util/mkl_util.h b/tensorflow/core/util/mkl_util.h
-index 04aaea4..dfd8ea5 100644
+index 9288074..dd131d3 100644
 --- a/tensorflow/core/util/mkl_util.h
 +++ b/tensorflow/core/util/mkl_util.h
 @@ -33,11 +33,6 @@ limitations under the License.
@@ -1759,6 +1619,128 @@ index 04aaea4..dfd8ea5 100644
  #ifdef INTEL_MKL_ML_ONLY
  #include "mkl_dnn.h"
  #include "mkl_dnn_types.h"
+diff --git a/tensorflow/lite/Makefile b/tensorflow/lite/Makefile
+new file mode 100644
+index 0000000..8cde710
+--- /dev/null
++++ b/tensorflow/lite/Makefile
+@@ -0,0 +1,73 @@
++SHELL := /bin/bash
++
++MAKEFILE_DIR := \$(shell dirname \$(realpath \$(lastword \$(MAKEFILE_LIST))))
++
++OBJDIR := \$(MAKEFILE_DIR)/gen/obj/
++BINDIR := \$(MAKEFILE_DIR)/gen/bin/
++LIBDIR := \$(MAKEFILE_DIR)/gen/lib/
++GENDIR := \$(MAKEFILE_DIR)/gen/obj/
++
++CC := gcc
++CXX := g++
++CCFLAGS := -O3 -DNDEBUG ${mopts} -DGEMMLOWP_ALLOW_SLOW_SCALAR_FALLBACK -pthread
++CXXFLAGS := \$(CCFLAGS) --std=c++11 -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
++INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I${prefix}/include -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++LIBS := -lfarmhash -lstdc++ -lpthread -lm -lz -ldl
++
++AR := ar
++ARFLAGS := -r
++
++LIB_NAME := libtensorflow-lite.a
++LIB_PATH := \$(LIBDIR)\$(LIB_NAME)
++
++MINIMAL_PATH := \$(BINDIR)minimal
++MINIMAL_SRCS := tensorflow/lite/examples/minimal/minimal.cc
++MINIMAL_OBJS := \$(addprefix \$(OBJDIR), \$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(MINIMAL_SRCS))))
++
++
++
++CORE_CC_ALL_SRCS := \$(wildcard tensorflow/lite/*.cc) \\
++                    \$(wildcard tensorflow/lite/*.c) \\
++                    \$(wildcard tensorflow/lite/c/*.c) \\
++                    \$(wildcard tensorflow/lite/core/*.cc) \\
++                    \$(wildcard tensorflow/lite/core/api/*.cc) \\
++                    \$(wildcard tensorflow/lite/kernels/*.cc) \\
++                    \$(wildcard tensorflow/lite/kernels/*.c) \\
++                    \$(wildcard tensorflow/lite/kernels/internal/*.cc) \\
++                    \$(wildcard tensorflow/lite/kernels/internal/*.c) \\
++                    \$(wildcard tensorflow/lite/kernels/internal/optimized/*.cc) \\
++                    \$(wildcard tensorflow/lite/kernels/internal/optimized/*.c) \\
++                    \$(wildcard tensorflow/lite/kernels/internal/reference/*.cc) \\
++                    \$(wildcard tensorflow/lite/kernels/internal/reference/*.c) \\
++                    tensorflow/lite/profiling/time.cc
++CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
++CORE_CC_EXCLUDE_SRCS := \$(wildcard tensorflow/lite/*test.cc) \\
++                        \$(wildcard tensorflow/lite/*/*test.cc) \\
++                        \$(wildcard tensorflow/lite/*/*/*test.cc) \\
++                        \$(wildcard tensorflow/lite/*/*/*/*test.cc) \\
++                        tensorflow/lite/kernels/internal/spectrogram.cc \\
++                        tensorflow/lite/kernels/test_util.cc
++TF_LITE_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
++TF_LITE_CC_OBJS := \$(addprefix \$(OBJDIR), \$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(TF_LITE_CC_SRCS))))
++LIB_OBJS := \$(TF_LITE_CC_OBJS)
++
++\$(OBJDIR)%.o: %.cc
++	@mkdir -p \$(dir \$@)
++	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) -c \$< -o \$@
++
++\$(OBJDIR)%.o: %.c
++	@mkdir -p \$(dir \$@)
++	\$(CC) \$(CCFLAGS) \$(INCLUDES) -c \$< -o \$@
++
++all: \$(LIB_PATH) \$(MINIMAL_PATH)
++
++\$(LIB_PATH): \$(LIB_OBJS)
++	@mkdir -p \$(dir \$@)
++	\$(AR) \$(ARFLAGS) \$(LIB_PATH) \$(LIB_OBJS)
++
++\$(MINIMAL_PATH): \$(MINIMAL_OBJS) \$(LIB_PATH)
++	@mkdir -p \$(dir \$@)
++	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) -o \$(MINIMAL_PATH) \$(MINIMAL_OBJS) \$(LIBFLAGS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS)
++
++clean:
++	rm -rf \$(MAKEFILE_DIR)/gen
+diff --git a/tensorflow/lite/interpreter.cc b/tensorflow/lite/interpreter.cc
+index e2129ed..7523011 100644
+--- a/tensorflow/lite/interpreter.cc
++++ b/tensorflow/lite/interpreter.cc
+@@ -20,6 +20,8 @@ limitations under the License.
+ #include <cstdint>
+ #include <cstring>
+ 
++#include <Eigen/Core>
++
+ #include "tensorflow/lite/c/c_api_internal.h"
+ #include "tensorflow/lite/context_util.h"
+ #include "tensorflow/lite/core/api/error_reporter.h"
+diff --git a/tensorflow/lite/kernels/register.cc b/tensorflow/lite/kernels/register.cc
+index c0e6f69..ee8ed3b 100644
+--- a/tensorflow/lite/kernels/register.cc
++++ b/tensorflow/lite/kernels/register.cc
+@@ -274,8 +274,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
+   // TODO(andrewharp, ahentz): Move these somewhere more appropriate so that
+   // custom ops aren't always included by default.
+   AddCustom("Mfcc", tflite::ops::custom::Register_MFCC());
+-  AddCustom("AudioSpectrogram",
+-            tflite::ops::custom::Register_AUDIO_SPECTROGRAM());
+   AddCustom("LayerNormLstm", tflite::ops::custom::Register_LAYER_NORM_LSTM());
+   AddCustom("Relu1", tflite::ops::custom::Register_RELU_1());
+   AddCustom("TFLite_Detection_PostProcess",
+diff --git a/tensorflow/lite/nnapi/NeuralNetworksShim.h b/tensorflow/lite/nnapi/NeuralNetworksShim.h
+index c39502f..7f93e98 100644
+--- a/tensorflow/lite/nnapi/NeuralNetworksShim.h
++++ b/tensorflow/lite/nnapi/NeuralNetworksShim.h
+@@ -74,8 +74,12 @@ inline void* loadFunction(const char* name) {
+ }
+ 
+ inline bool NNAPIExists() {
++#ifdef __ANDROID__
+   static bool nnapi_is_available = getLibraryHandle();
+   return nnapi_is_available;
++#else
++  return false;
++#endif
+ }
+ 
+ // NN api types based on NNAPI header file
 EOD
         rc=$?
         if [ $rc != 0 ]; then
@@ -1770,16 +1752,16 @@ EOD
     fi
 
     # Build tensorflow lite.
-    make -j$(nproc) -f tensorflow/contrib/lite/Makefile
+    make -j$(nproc) -f tensorflow/lite/Makefile
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to build Tensorflow lite!${NC}"
         return 1
     fi
     sudo mkdir -p $prefix/lib &&
-    sudo install tensorflow/contrib/lite/gen/lib/libtensorflow-lite.a $prefix/lib &&
+    sudo install tensorflow/lite/gen/lib/libtensorflow-lite.a $prefix/lib &&
     sudo mkdir -p $prefix/include &&
-    install_headers tensorflow/contrib/lite $prefix/include
+    install_headers tensorflow/lite $prefix/include
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to install Tensorflow lite!${NC}"
@@ -1861,7 +1843,7 @@ install_ffmpeg() {
         fi
     fi
     cd ffmpeg
-    ./configure --enable-gpl --enable-version3 --disable-pic --enable-static --disable-shared \
+    ./configure --enable-gpl --enable-version3 --enable-pic --enable-static --disable-shared \
                 --disable-everything --enable-runtime-cpudetect --enable-libx264 \
                 --enable-parser=h264 --enable-parser=mjpeg \
                 --enable-parser=mpeg4video --enable-parser=mpegaudio --enable-parser=mpegvideo \

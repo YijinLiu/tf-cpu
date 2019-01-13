@@ -471,4 +471,16 @@ ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 320x180 frames processed in 2767
 ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 320x180 frames processed in 30956 ms(106 mspf).
 ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 320x180 frames processed in 18974 ms(65 mspf).
 ssdlite_mobilenet_v2_mixed/beach.mkv: 290 320x180 frames processed in 11276 ms(38 mspf).
+
+2. Intel(R) Celeron(R) CPU N3350 @ 1.10GHz
+ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 320x180 frames processed in 161643 ms(557 mspf).
+ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 320x180 frames processed in 223314 ms(770 mspf).
+ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 320x180 frames processed in 116901 ms(403 mspf).
+ssdlite_mobilenet_v2_mixed/beach.mkv: 290 320x180 frames processed in 73930 ms(254 mspf).
+
+3. Intel(R) Core(TM) i3-4130 CPU @ 3.40GHz
+ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 320x180 frames processed in 40642 ms(140 mspf).
+ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 320x180 frames processed in 45702 ms(157 mspf).
+ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 320x180 frames processed in 30149 ms(103 mspf).
+ssdlite_mobilenet_v2_mixed/beach.mkv: 290 320x180 frames processed in 17581 ms(60 mspf).
 */

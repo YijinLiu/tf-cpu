@@ -1,0 +1,21 @@
+animal
+bear
+bicycle
+bird
+bus
+car
+cat
+dhl
+dog
+fedex
+motorcycle
+mouse
+person
+rabbit
+raccoon
+skunk
+small animal
+squirrel
+truck
+ups
+usps

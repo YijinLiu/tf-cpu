@@ -92,14 +92,14 @@ run_classify: $(BIN)/classify \
 run_obj_detect: run_obj_detect_ssd_mobilenet_v1_coco_2017_11_17 \
                 run_obj_detect_ssd_mobilenet_v2_coco_2018_03_29 \
                 run_obj_detect_ssdlite_mobilenet_v2_coco_2018_05_09 \
-                run_obj_detect_ssd_mobilenet_v1_fpn_shared_box_predictor_640x640_coco14_sync_2018_07_03 \
-                run_obj_detect_ssdlite_mobilenet_v2_coco10
+                run_obj_detect_ssdlite_mobilenet_v2_mixed
 
 OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v1_coco_2017_11_17=coco_labels.txt
 OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v2_coco_2018_03_29=coco_labels.txt
 OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_coco_2018_05_09=coco_labels.txt
 OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v1_fpn_shared_box_predictor_640x640_coco14_sync_2018_07_03=coco_labels.txt
 OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_coco10=coco10_labels.txt
+OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_mixed=mixed_labels.txt
 
 run_obj_detect_%: $(TESTDATA)/%_frozen.pb $(BIN)/obj_detect
 	@echo -e "\e[0;92mRunning $* ...\e[0m"
@@ -128,6 +128,7 @@ train_mnist: $(BIN)/mnist \
 
 PREFIX?=/usr/local
 BLAS?=MKL
+# Don't unset this. Use TF_DISABLE_MKL=1 to disable MKL.
 USE_MKLDNN?=1
 BLAS_CXXFLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 BLAS_CXXFLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
@@ -224,6 +225,9 @@ $(TESTDATA)/mobilenet_v2_%_frozen.pb: $(PROJECT_ROOT)/models/mobilenet/v2/mobile
 	cd $(TESTDATA) ; tar xf $< ./mobilenet_v2_$*_frozen.pb ; touch $@
 
 $(TESTDATA)/ssdlite_mobilenet_v2_coco10_frozen.pb: $(PROJECT_ROOT)/models/objdetect/coco10.pb
+	cp $< $@
+
+$(TESTDATA)/ssdlite_mobilenet_v2_mixed_frozen.pb: $(PROJECT_ROOT)/models/objdetect/mixed.pb
 	cp $< $@
 
 $(TESTDATA)/%_frozen.pb: $(PROJECT_ROOT)/models/objdetect/%.tar.gz

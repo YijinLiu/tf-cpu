@@ -19,6 +19,7 @@ blas=MKL
 version=0a708f8da4afc5099cae1493dfb60a5680dadf2f
 bazel_version=0.19.2
 prefix=/usr/local
+# Use "gcc -march=native -Q --help=target" to see which options are enabled.
 mopts="-march=native"
 mkldnn_version=0.17.2
 
@@ -850,16 +851,17 @@ install_tensorflow() {
     if [ ! -d tensorflow ] ; then
         if [[ $version =~ ^[0-9a-f]+$ ]] ; then
             git clone https://github.com/tensorflow/tensorflow &&
+            cd tensorflow
             git reset $version --hard
         else
             git clone --depth=1 https://github.com/tensorflow/tensorflow -b v${version}
+            cd tensorflow
         fi
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download TensorFlow source!${NC}"
             return 1
         fi
-        cd tensorflow
         patch -l -p1 <<- EOD
 diff --git a/tensorflow/cc/gradients/math_grad.cc b/tensorflow/cc/gradients/math_grad.cc
 index 1329b56..b65bf88 100644
@@ -1741,6 +1743,64 @@ index c39502f..7f93e98 100644
  }
  
  // NN api types based on NNAPI header file
+diff --git a/tensorflow/core/graph/mkl_layout_pass.cc b/tensorflow/core/graph/mkl_layout_pass.cc
+index 9495132f4a..32bcdb2e7e 100644
+--- a/tensorflow/core/graph/mkl_layout_pass.cc
++++ b/tensorflow/core/graph/mkl_layout_pass.cc
+@@ -335,8 +335,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     // NOTE: names are alphabetically sorted.
+     rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
+                       CopyAttrsAddN, AddNRewrite});
+-    rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
+-                      CopyAttrsDataType, AlwaysRewrite});
++    /*rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
++                      CopyAttrsDataType, AlwaysRewrite});*/
+     rinfo_.push_back({csinfo_.avg_pool,
+                       mkl_op_registry::GetMklOpName(csinfo_.avg_pool),
+                       CopyAttrsPooling, AlwaysRewrite});
+@@ -352,9 +352,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     rinfo_.push_back({csinfo_.concat,
+                       mkl_op_registry::GetMklOpName(csinfo_.concat),
+                       CopyAttrsConcat, AlwaysRewrite});
+-    rinfo_.push_back({csinfo_.concatv2,
++    /*rinfo_.push_back({csinfo_.concatv2,
+                       mkl_op_registry::GetMklOpName(csinfo_.concatv2),
+-                      CopyAttrsConcatV2, AlwaysRewrite});
++                      CopyAttrsConcatV2, AlwaysRewrite});*/
+     rinfo_.push_back({csinfo_.conv2d,
+                       mkl_op_registry::GetMklOpName(csinfo_.conv2d),
+                       CopyAttrsConv, AlwaysRewrite});
+@@ -419,8 +419,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     rinfo_.push_back({csinfo_.maximum,
+                       mkl_op_registry::GetMklOpName(csinfo_.maximum),
+                       CopyAttrsDataType, AlwaysRewrite});
+-    rinfo_.push_back({csinfo_.mul, mkl_op_registry::GetMklOpName(csinfo_.mul),
+-                      CopyAttrsDataType, AlwaysRewrite});
++    /*rinfo_.push_back({csinfo_.mul, mkl_op_registry::GetMklOpName(csinfo_.mul),
++                      CopyAttrsDataType, AlwaysRewrite});*/
+     rinfo_.push_back({csinfo_.pad_with_conv2d, csinfo_.mkl_pad_with_conv2d,
+                       CopyAttrsPadWithConv2D, AlwaysRewrite});
+ #ifdef INTEL_MKL_QUANTIZED
+@@ -496,17 +496,15 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+                       mkl_op_registry::GetMklOpName(csinfo_.requantize),
+                       CopyAttrsRequantize, AlwaysRewrite});
+ #endif
+-    /*
+-    rinfo_.push_back({csinfo_.tanh,
++    /*rinfo_.push_back({csinfo_.tanh,
+                       mkl_op_registry::GetMklOpName(csinfo_.tanh),
+                       CopyAttrsDataType, AlwaysRewrite});
+     rinfo_.push_back({csinfo_.tanh_grad,
+                       mkl_op_registry::GetMklOpName(csinfo_.tanh_grad),
+                       CopyAttrsDataType, AlwaysRewrite});
+-    */
+     rinfo_.push_back({csinfo_.reshape,
+                       mkl_op_registry::GetMklOpName(csinfo_.reshape),
+-                      CopyAttrsReshape, AlwaysRewrite});
++                      CopyAttrsReshape, AlwaysRewrite});*/
+     rinfo_.push_back({csinfo_.slice,
+                       mkl_op_registry::GetMklOpName(csinfo_.slice),
+                       CopyAttrsSlice, AlwaysRewrite});
 EOD
         rc=$?
         if [ $rc != 0 ]; then

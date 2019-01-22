@@ -61,6 +61,34 @@ install_deps() {
     fi
 }
 
+install_gperftools() {
+    # tcmalloc doesn't work on arm. No idea why.
+    if [ "$ARCH" == "armv7l" ]; then
+        return
+    fi
+
+    if [ ! -d "gperftools" ]; then
+        git clone --depth=1 https://github.com/gperftools/gperftools -b gperftools-2.7
+        rc=$?
+        if [ $rc != 0 ]; then
+            echo -e "${RED}Failed to download gperftools${NC}"
+            return 1
+        fi
+    fi
+    cd gperftools
+    ./autogen.sh &&
+    ./configure --with-pic --enable-shared --enable-static --with-tcmalloc-pagesize=32 \
+        --prefix=$prefix &&
+    make && sudo make install
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to build gperftools${NC}"
+        return 1
+    fi
+
+    cd ..
+}
+
 install_headers() {
     src=$1
     dst=$2
@@ -1606,21 +1634,174 @@ index ee528c7..0ed9f39 100644
      .Input("features: T")
      .Input("labels: T")
 diff --git a/tensorflow/core/util/mkl_util.h b/tensorflow/core/util/mkl_util.h
-index 9288074..dd131d3 100644
+index 125a2e6b23..e38153bed6 100644
 --- a/tensorflow/core/util/mkl_util.h
 +++ b/tensorflow/core/util/mkl_util.h
-@@ -33,11 +33,6 @@ limitations under the License.
- #error "at most one of INTEL_MKL_ML_ONLY and INTEL_MKL_DNN_ONLY may be defined"
- #endif
+@@ -17,6 +17,7 @@ limitations under the License.
+ #define TENSORFLOW_CORE_UTIL_MKL_UTIL_H_
+ #ifdef INTEL_MKL
  
--#ifdef INTEL_MKL_ML_ONLY
--#error \\
--    "Compiling for INTEL MKL ML only is no longer supported.Please use MKL DNN (the default option for --config=mkl)"
--#endif
++#include <list>
+ #include <memory>
+ #include <string>
+ #include <unordered_map>
+@@ -1766,6 +1767,7 @@ class MklDnnData {
+   inline void SetUsrMem(const memory::primitive_desc& pd,
+                         void* data_buffer = nullptr) {
+     CHECK_NOTNULL(cpu_engine_);
++    if (user_memory_) delete user_memory_;
+     // TODO(nhasabni): can we remove dynamic memory allocation?
+     if (data_buffer) {
+       user_memory_ = new memory(pd, data_buffer);
+@@ -2060,6 +2062,106 @@ class MklPrimitive {
+ 
+ const mkldnn::memory::dims NONE_DIMS = {};
+ 
++// LRUCache is a class which implements LRU (Least Recently Use) cache.
++// The implementation is similar to that of
++//    tensorflow/core/platform/cloud/expiring_lru_cache.h
++// without its thread-safe part because the cache is supposed to be
++// used as thread local (for instance, MKLPrimitive caching).
++//
++// The LRU list maintains objects in chronological order based on
++// creation time, with the least recently accessed object at the
++// tail of LRU list, while the most recently accessed object
++// at the head of LRU list.
++//
++// This class is used to maintain an upper bound on the total number of
++// cached items. When the cache reaches its capacity, the LRU item will
++// be removed and replaced by a new one from SetOp call.
++//
++template <typename T>
++class LRUCache {
++ public:
++  explicit LRUCache(size_t capacity) {
++    capacity_ = capacity;
++    Clear();
++  }
++
++  T* GetOp(const string& key) {
++    auto it = cache_.find(key);
++    if (it == cache_.end()) {
++      return nullptr;
++    }
++
++    // Move to the front of LRU list as the most recently accessed.
++    lru_list_.erase(it->second.lru_iterator);
++    lru_list_.push_front(it->first);
++    it->second.lru_iterator = lru_list_.begin();
++    return it->second.op;
++  }
++
++  void SetOp(const string& key, T* op) {
++    if (lru_list_.size() >= capacity_) {
++      Delete();
++    }
++
++    // Insert an entry to the front of the LRU list
++    lru_list_.push_front(key);
++    Entry entry(op, lru_list_.begin());
++    cache_.insert(std::make_pair(key, entry));
++  }
++
++  void Clear() {
++    if (lru_list_.empty()) return;
++
++    // delete the cached objects
++    for (auto& key : lru_list_) {
++      auto it = cache_.find(key);
++      DCHECK(it == cache_.end());
++      delete it->second.op;
++    }
++
++    // clean up the cache
++    cache_.clear();
++    lru_list_.clear();
++  }
++
++ private:
++  struct Entry {
++    // The entry's value.
++    T* op;
++
++    // A list iterator pointing to the entry's position in the LRU list.
++    std::list<string>::iterator lru_iterator;
++    Entry(T* op, std::list<string>::iterator it) {
++      this->op = op;
++      this->lru_iterator = it;
++    }
++  };
++
++  // Remove the least recently accessed entry from LRU list, which
++  // is the tail of lru_list_. Correspondingly cache_ is updated.
++  bool Delete() {
++    if (lru_list_.empty()) return false;
++    string key = lru_list_.back();
++    auto it = cache_.find(key);
++    DCHECK(it == cache_.end());
++    lru_list_.pop_back();
++    delete it->second.op;  // delete the object
++    cache_.erase(it);
++    return true;
++  }
++
++  // cache capacity
++  size_t capacity_;
++
++  // The cache, a map from string key to a LRU entry.
++  std::unordered_map<string, Entry> cache_;
++
++  // The LRU list of entries.
++  // The front of the list identifies the most recently accessed entry,
++  // while the back of the list is the least recently accessed entry.
++  std::list<string> lru_list_;
++};
++
+ template <typename T>
+ class MklPrimitiveFactory {
+  public:
+@@ -2068,23 +2170,13 @@ class MklPrimitiveFactory {
+   ~MklPrimitiveFactory() {}
+ 
+   MklPrimitive* GetOp(const string& key) {
+-    auto& map = MklPrimitiveFactory<T>::GetHashMap();
+-    auto stream_iter = map.find(key);
+-    if (stream_iter == map.end()) {
+-      return nullptr;
+-    } else {
+-      CHECK(stream_iter->second != nullptr) << "nullptr present in map";
+-      return stream_iter->second;
+-    }
++    auto& lru_cache = MklPrimitiveFactory<T>::GetLRUCache();
++    return lru_cache.GetOp(key);
+   }
+ 
+   void SetOp(const string& key, MklPrimitive* op) {
+-    auto& map = MklPrimitiveFactory<T>::GetHashMap();
+-    auto stream_iter = map.find(key);
 -
- #ifdef INTEL_MKL_ML_ONLY
- #include "mkl_dnn.h"
- #include "mkl_dnn_types.h"
+-    CHECK(stream_iter == map.end());
+-
+-    map[key] = op;
++    auto& lru_cache = MklPrimitiveFactory<T>::GetLRUCache();
++    lru_cache.SetOp(key, op);
+   }
+ 
+   /// Function to decide whether HW has AVX512 or AVX2
+@@ -2104,9 +2196,10 @@ class MklPrimitiveFactory {
+   }
+ 
+  private:
+-  static inline std::unordered_map<string, MklPrimitive*>& GetHashMap() {
+-    static thread_local std::unordered_map<string, MklPrimitive*> map_;
+-    return map_;
++   static inline LRUCache<MklPrimitive>& GetLRUCache() {
++    static const int kCapacity = 1024;  // cache capacity
++    static thread_local LRUCache<MklPrimitive> lru_cache_(kCapacity);
++    return lru_cache_;
+   }
+ };
+ 
 diff --git a/tensorflow/lite/Makefile b/tensorflow/lite/Makefile
 new file mode 100644
 index 0000000..8cde710
@@ -2128,6 +2309,7 @@ install_opencv() {
 }
 
 install_deps &&
+install_gperftools &&
 install_abseil_cpp &&
 install_blas &&
 install_eigen &&

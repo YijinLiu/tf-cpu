@@ -16,12 +16,12 @@ usage() {
 }
 
 blas=MKL
-version=0a708f8da4afc5099cae1493dfb60a5680dadf2f
+version=2.0.0-alpha0
 bazel_version=0.19.2
 prefix=/usr/local
 # Use "gcc -march=native -Q --help=target" to see which options are enabled.
 mopts="-march=native"
-mkldnn_version=0.17.2
+mkldnn_version=0.19
 
 OPTS=`getopt -n 'build.sh' -o b:,m:,p:,v: -l blas:,version:,bazel_version:,mkldnn_version:,prefix:,mopts: -- "$@"`
 rc=$?
@@ -43,23 +43,6 @@ while true; do
     esac
 done
 echo -e ${GREEN}BLAS: $blas${NC}
-
-blas_pkgs=
-case "$blas" in
-    OpenBLAS | ATLAS ) blas_pkgs=libgfortran-5-dev
-esac
-
-install_deps() {
-    sudo apt update &&
-    sudo apt install -y --no-install-recommends autoconf automake build-essential cmake cpio curl \
-        git libjpeg-dev libtool openjdk-8-jdk python unzip wget yasm zlib1g-dev $blas_pkgs &&
-    sudo apt clean
-    rc=$?
-    if [ $rc != 0 ]; then
-        echo -e "${RED}Failed to install dependant packages!${NC}"
-        return 1
-    fi
-}
 
 install_gperftools() {
     # tcmalloc doesn't work on arm. No idea why.
@@ -243,8 +226,8 @@ install_openblas() {
 # Visit https://software.seek.intel.com/performance-libraries
 # to find latest versions of MKL and IPP.
 install_mkl() {
-    prid="14895"
-    ver="2019.1.144"
+    prid="15275"
+    ver="2019.3.199"
     if [ ! -d "l_mkl_${ver}" ]; then
         if [ ! -f "l_mkl_${ver}.tgz" ]; then
             wget http://registrationcenter-download.intel.com/akdlm/irc_nas/tec/${prid}/l_mkl_${ver}.tgz
@@ -2308,7 +2291,62 @@ install_opencv() {
     cd ../..
 }
 
-install_deps &&
+install_dldt() {
+    if [ ! -d "dldt" ] ; then
+        git clone --depth=1 https://github.com/opencv/dldt -b 2019_R1.0.1
+        rc=$?
+        if [ $rc != 0 ]; then
+            echo -e "${RED}Failed to download Intel DLDT source!${NC}"
+            return 1
+        fi
+    fi
+    cd dldt/inference-engine
+    git submodule init &&
+    git submodule update --recursive
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to install dependencies for DLDT inference engine!${NC}"
+        return 1
+    fi
+    mkdir -p build
+    cd build
+    cmake -DCMAKE_INSTALL_PREFIX=$prefix -DCMAKE_BUILD_TYPE=Release -DTHREADING=SEQ \
+          -DENABLE_OPENCV=OFF -DENABLE_SAMPLES=OFF -DENABLE_SAMPLES_CORE=OFF \
+          -DENABLE_SEGMENTATION_TESTS=OFF -DENABLE_OBJECT_DETECTION_TESTS=OFF .. &&
+    make -j $(nproc)
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to build DLDT inference engine!${NC}"
+        return 1
+    fi
+    cd ..
+    mkdir -p $prefix/include $prefix/lib $prefix/dldt_plugins &&
+    sudo cp -r include $prefix/include/dldt &&
+    sudo cp src/extension/ext_list.hpp $prefix/include/dldt &&
+    sudo cp bin/intel64/Release/lib/libinference_engine_s.a \
+            bin/intel64/Release/lib/libpugixml.a \
+            bin/intel64/Release/lib/libcpu_extension.so \
+            bin/intel64/Release/lib/libclDNN64.so $prefix/lib
+    sudo cp bin/intel64/Release/lib/libclDNNPlugin.so \
+            bin/intel64/Release/lib/libGNAPlugin.so \
+            bin/intel64/Release/lib/libHeteroPlugin.so \
+            bin/intel64/Release/lib/libMKLDNNPlugin.so $prefix/dldt_plugins
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to install inference engine!${NC}"
+        return 1
+    fi
+    cd ..
+    sudo -H pip3 install -r dldt/model-optimizer/requirements.txt &&
+    sudo cp -r model-optimizer $prefix
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to install model optimizer!${NC}"
+        return 1
+    fi
+    cd ..
+}
+
 install_gperftools &&
 install_abseil_cpp &&
 install_blas &&
@@ -2327,4 +2365,5 @@ install_ffmpeg &&
 install_gflags &&
 install_glog &&
 install_google_benchmark &&
-install_opencv
+install_opencv &&
+install_dldt

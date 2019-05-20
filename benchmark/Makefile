@@ -6,7 +6,7 @@ SRC:=$(PROJECT_ROOT)/benchmark
 BIN:=$(PROJECT_ROOT)/benchmark/bin
 TESTDATA:=$(PROJECT_ROOT)/benchmark/testdata
 
-all: run_classify_lite run_obj_detect_lite run_classify run_obj_detect
+all: run_classify_lite run_obj_detect_lite run_classify run_obj_detect run_obj_detect_dldt
 
 run_classify_lite: $(BIN)/classify_lite \
                    $(TESTDATA)/mobilenet_v1_1.0_224_quant.tflite \
@@ -55,7 +55,7 @@ run_obj_detect_lite: $(BIN)/obj_detect_lite
 	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.tflite \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
 
-TF_VLOG_LEVEL?=-1
+VLOG_LEVEL?=-1
 
 run_classify: $(BIN)/classify \
               $(TESTDATA)/mobilenet_v1_1.0_224_quant_frozen.pb \
@@ -87,12 +87,27 @@ run_classify: $(BIN)/classify \
               $(TESTDATA)/mobilenet_v2_0.75_128_frozen.pb \
               $(TESTDATA)/mobilenet_v2_0.75_96_frozen.pb \
               $(TESTDATA)/mobilenet_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/classify
+	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/classify
 
-run_obj_detect: run_obj_detect_ssd_mobilenet_v1_coco_2017_11_17 \
-                run_obj_detect_ssd_mobilenet_v2_coco_2018_03_29 \
-                run_obj_detect_ssdlite_mobilenet_v2_coco_2018_05_09 \
-                run_obj_detect_ssdlite_mobilenet_v2_mixed
+run_obj_detect_dldt: run_obj_detect_dldt_model_ssdlite_mobilenet_v2_coco_2018_05_09
+
+run_obj_detect_dldt_model_%: $(TESTDATA)/%_frozen.xml $(BIN)/obj_detect_dldt
+	@echo -e "\e[0;92mRunning $* ...\e[0m"
+	@mkdir -p $*_dldt
+	$(BIN)/obj_detect_dldt \
+	    --model $(TESTDATA)/$*_frozen --plugin_dir /usr/local/dldt_plugins --device=CPU \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
+	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg \
+	    --output_dir=$*_dldt --logtostderr -v=$(VLOG_LEVEL)
+	$(BIN)/obj_detect_dldt \
+	    --model $(TESTDATA)/$*_frozen --plugin_dir /usr/local/dldt_plugins --device=CPU \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
+	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_dldt --logtostderr -v=$(VLOG_LEVEL)
+
+run_obj_detect: run_obj_detect_model_ssd_mobilenet_v1_coco_2017_11_17 \
+                run_obj_detect_model_ssd_mobilenet_v2_coco_2018_03_29 \
+                run_obj_detect_model_ssdlite_mobilenet_v2_coco_2018_05_09 \
+                run_obj_detect_model_ssdlite_mobilenet_v2_mixed
 
 OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v1_coco_2017_11_17=coco_labels.txt
 OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v2_coco_2018_03_29=coco_labels.txt
@@ -101,20 +116,20 @@ OBJ_DETECT_LABELS_TXT/ssd_mobilenet_v1_fpn_shared_box_predictor_640x640_coco14_s
 OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_coco10=coco10_labels.txt
 OBJ_DETECT_LABELS_TXT/ssdlite_mobilenet_v2_mixed=mixed_labels.txt
 
-run_obj_detect_%: $(TESTDATA)/%_frozen.pb $(BIN)/obj_detect
+run_obj_detect_model_%: $(TESTDATA)/%_frozen.pb $(BIN)/obj_detect
 	@echo -e "\e[0;92mRunning $* ...\e[0m"
 	@mkdir -p $*
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/obj_detect \
 	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg --output_dir=$* \
 	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/obj_detect \
 	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$* \
 	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 
 run_face_detect: $(BIN)/obj_detect \
                  $(TESTDATA)/frozen_inference_graph_face.pb \
                  $(TESTDATA)/face_labels.txt
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/obj_detect \
+	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/obj_detect \
 	    --video_file=$(TESTDATA)/jurassic_world.mkv --output=jurassic_world.face.mkv \
 	    --model_file=$(TESTDATA)/frozen_inference_graph_face.pb \
 	    --labels_file=$(TESTDATA)/face_labels.txt
@@ -124,7 +139,7 @@ train_mnist: $(BIN)/mnist \
              $(TESTDATA)/mnist_data/train-labels-idx1-ubyte \
              $(TESTDATA)/mnist_data/t10k-images-idx3-ubyte \
              $(TESTDATA)/mnist_data/t10k-labels-idx1-ubyte
-	TF_CPP_MIN_VLOG_LEVEL=$(TF_VLOG_LEVEL) $(BIN)/mnist -data_dir=$(TESTDATA)/mnist_data
+	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/mnist -data_dir=$(TESTDATA)/mnist_data
 
 PREFIX?=/usr/local
 BLAS?=MKL
@@ -198,6 +213,14 @@ $(BIN)/obj_detect: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect.
 	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion -labsl \
 	    $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
+$(BIN)/obj_detect_dldt.o: obj_detect_dldt.cc test_video.hpp video_encoder.hpp utils.hpp
+	mkdir -p $(BIN)
+	g++ -c $(CXXFLAGS) -fexceptions -I/usr/local/include/dldt $< -o $@
+
+$(BIN)/obj_detect_dldt: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_dldt.o
+	mkdir -p $(BIN)
+	g++ -o $@ $^ -linference_engine_s -lpugixml -lcpu_extension $(OPENCV_LDFLAGS) $(LDFLAGS)
+
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $(BLAS_CXXFLAGS/$(BLAS)) $< -o $@
@@ -223,6 +246,15 @@ $(TESTDATA)/mobilenet_v1_%_frozen.pb: $(PROJECT_ROOT)/models/mobilenet/v1/mobile
 
 $(TESTDATA)/mobilenet_v2_%_frozen.pb: $(PROJECT_ROOT)/models/mobilenet/v2/mobilenet_v2_%.tgz
 	cd $(TESTDATA) ; tar xf $< ./mobilenet_v2_$*_frozen.pb ; touch $@
+
+$(TESTDATA)/ssdlite_mobilenet_v2_coco.config:
+	wget -P $(dir $@) https://raw.githubusercontent.com/tensorflow/models/v1.13.0/research/object_detection/samples/configs/ssdlite_mobilenet_v2_coco.config
+
+$(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.xml: $(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
+                                                             $(TESTDATA)/ssdlite_mobilenet_v2_coco.config
+	/usr/local/model-optimizer/mo_tf.py --input_model $< --output_dir $(TESTDATA) \
+		--tensorflow_use_custom_operations_config /usr/local/model-optimizer/extensions/front/tf/ssd_v2_support.json \
+		--tensorflow_object_detection_api_pipeline_config $(TESTDATA)/ssdlite_mobilenet_v2_coco.config
 
 $(TESTDATA)/ssdlite_mobilenet_v2_coco10_frozen.pb: $(PROJECT_ROOT)/models/objdetect/coco10.pb
 	cp $< $@

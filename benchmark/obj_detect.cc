@@ -23,8 +23,8 @@ DEFINE_string(labels_file, "", "");
 
 DEFINE_string(video_file, "", "");
 DEFINE_string(image_files, "", "Comma separated image files");
-DEFINE_int32(width, 320, "");
-DEFINE_int32(height, 0, "");
+DEFINE_int32(width, 300, "");
+DEFINE_int32(height, 300, "");
 DEFINE_string(output_dir, ".", "");
 DEFINE_bool(output_video, true, "");
 DEFINE_int32(batch_size, 1, "");
@@ -310,36 +310,6 @@ class ObjDetector {
         return true;
     }
 
-    void FeedInAVFrame(AVFrame* frame) {
-        const int size = input_tensor_->NumElements();
-        const int row_elems = frame->width * input_channels_;
-        switch (input_dtype_) {
-            case tensorflow::DT_FLOAT:
-                {
-                    float* data = input_tensor_->flat<float>().data();
-                    for (int i = 0; i < size; i++) {
-                        const int row = i / row_elems;
-                        const int pos = row * frame->linesize[0] + (i % row_elems);
-                        data[i] = frame->data[0][pos] / 256.f;
-                    }
-                    break;
-                }
-            case tensorflow::DT_UINT8:
-                {
-                    uint8_t* dst = input_tensor_->flat<uint8_t>().data();
-                    uint8_t* src = frame->data[0];
-                    for (int row = 0; row < frame->height; row++) {
-                        memcpy(dst, src, row_elems);
-                        dst += row_elems;
-                        src += frame->linesize[0];
-                    }
-                }
-                break;
-            default:
-                LOG(FATAL) << "Should not reach here!";
-        }
-    }
-
     void FeedInMat(const cv::Mat& mat, int batch_index) {
         const int size = mat.rows * mat.cols * input_channels_;
         switch (input_dtype_) {
@@ -405,7 +375,7 @@ class ObjDetector {
         const float* detection_boxes = TensorData<float>(output_tensors[3], batch_index);
         for (int i = 0; i < num_detections; i++) {
             const float score = detection_scores[i];
-            if (score < .3f) break;
+            if (score < .51f) break;
             const int cls = detection_classes[i];
             if (cls == 0) continue;
             const int ymin = detection_boxes[4 * i] * mat.rows;
@@ -467,20 +437,7 @@ int main(int argc, char** argv) {
 
 /*
 1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
-ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 320x180 frames processed in 27674 ms(95 mspf).
 ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 320x180 frames processed in 30956 ms(106 mspf).
-ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 320x180 frames processed in 18974 ms(65 mspf).
-ssdlite_mobilenet_v2_mixed/beach.mkv: 290 320x180 frames processed in 11276 ms(38 mspf).
-
-2. Intel(R) Celeron(R) CPU N3350 @ 1.10GHz
-ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 320x180 frames processed in 161643 ms(557 mspf).
-ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 320x180 frames processed in 223314 ms(770 mspf).
-ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 320x180 frames processed in 116901 ms(403 mspf).
-ssdlite_mobilenet_v2_mixed/beach.mkv: 290 320x180 frames processed in 73930 ms(254 mspf).
-
-3. Intel(R) Core(TM) i3-4130 CPU @ 3.40GHz
-ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 320x180 frames processed in 40642 ms(140 mspf).
-ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 320x180 frames processed in 45702 ms(157 mspf).
-ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 320x180 frames processed in 30149 ms(103 mspf).
-ssdlite_mobilenet_v2_mixed/beach.mkv: 290 320x180 frames processed in 17581 ms(60 mspf).
+ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 300x300 frames processed in 21592 ms(74 mspf).
+ssdlite_mobilenet_v2_mixed/beach.mkv: 290 300x300 frames processed in 13702 ms(47 mspf).
 */

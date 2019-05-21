@@ -2299,21 +2299,23 @@ install_dldt() {
             echo -e "${RED}Failed to download Intel DLDT source!${NC}"
             return 1
         fi
-    fi
-    cd dldt/inference-engine
-    git submodule init &&
-    git submodule update --recursive
-    rc=$?
-    if [ $rc != 0 ]; then
-        echo -e "${RED}Failed to install dependencies for DLDT inference engine!${NC}"
-        return 1
+        cd dldt/inference-engine
+        git submodule init &&
+            git submodule update --recursive
+        rc=$?
+        if [ $rc != 0 ]; then
+            echo -e "${RED}Failed to install dependencies for DLDT inference engine!${NC}"
+            return 1
+        fi
+    else
+        cd dldt/inference-engine
     fi
     mkdir -p build
     cd build
     cmake -DCMAKE_INSTALL_PREFIX=$prefix -DCMAKE_BUILD_TYPE=Release -DTHREADING=SEQ \
           -DENABLE_OPENCV=OFF -DENABLE_SAMPLES=OFF -DENABLE_SAMPLES_CORE=OFF \
           -DENABLE_SEGMENTATION_TESTS=OFF -DENABLE_OBJECT_DETECTION_TESTS=OFF .. &&
-    make -j $(nproc)
+    make -j $(nproc) all ie_cpu_extension_s
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to build DLDT inference engine!${NC}"
@@ -2325,8 +2327,13 @@ install_dldt() {
     sudo cp src/extension/ext_list.hpp $prefix/include/dldt &&
     sudo cp bin/intel64/Release/lib/libinference_engine_s.a \
             bin/intel64/Release/lib/libpugixml.a \
+            bin/intel64/Release/lib/libfluid.a \
             bin/intel64/Release/lib/libcpu_extension.so \
-            bin/intel64/Release/lib/libclDNN64.so $prefix/lib
+            bin/intel64/Release/lib/libie_cpu_extension_s.a \
+            bin/intel64/Release/lib/libmkldnn.a \
+            bin/intel64/Release/lib/libclDNN64.so \
+            build/lib/libade.a $prefix/lib &&
+    sudo cp bin/intel64/Release/lib/libtest_MKLDNNPlugin.a $prefix/lib/libMKLDNNPlugin_s.a &&
     sudo cp bin/intel64/Release/lib/libclDNNPlugin.so \
             bin/intel64/Release/lib/libGNAPlugin.so \
             bin/intel64/Release/lib/libHeteroPlugin.so \
@@ -2337,7 +2344,7 @@ install_dldt() {
         return 1
     fi
     cd ..
-    sudo -H pip3 install -r dldt/model-optimizer/requirements.txt &&
+    sudo -H pip3 install -r model-optimizer/requirements.txt &&
     sudo cp -r model-optimizer $prefix
     rc=$?
     if [ $rc != 0 ]; then

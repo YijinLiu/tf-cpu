@@ -114,6 +114,14 @@ struct AVFrameWrapper {
     AVFrame* frame;
 };
 
+InferencePlugin StaticLinkedCpuPlugin() {
+    IInferencePlugin* impl = nullptr;
+    ResponseDesc desc;
+    const StatusCode code = CreatePluginEngine(impl, &desc);
+    if (code != OK) THROW_IE_EXCEPTION << desc.msg;
+    return InferencePlugin(InferenceEnginePluginPtr(impl));
+}
+
 class ObjDetector {
   public:
     ObjDetector(const std::vector<std::string>& labels) : labels_(labels) {};
@@ -122,10 +130,15 @@ class ObjDetector {
         VLOG(1) << "InferenceEngine: " << VersionString(GetInferenceEngineVersion());
         err_listener_.set_prefix(Sprintf("[IE %s] ", device.c_str()));
         try {
-            plugin_ = PluginDispatcher({plugin_dir}).getPluginByDevice(device);
-            static_cast<InferenceEngine::InferenceEnginePluginPtr>(plugin_)->SetLogCallback(
-                err_listener_);
+            if (plugin_dir.empty() && device == "CPU") {
+                VLOG(1) << "Use static linked CPU plugin.";
+                plugin_ = StaticLinkedCpuPlugin();
+            } else {
+                plugin_ = PluginDispatcher({plugin_dir}).getPluginByDevice(device);
+            }
+            static_cast<InferenceEnginePluginPtr>(plugin_)->SetLogCallback(err_listener_);
             if (device == "CPU") {
+                VLOG(1) << "Adding CPU extension...";
                 plugin_.AddExtension(std::make_shared<Extensions::Cpu::CpuExtensions>());
             }
             std::map<std::string, std::string> cfgs;

@@ -1,5 +1,5 @@
 // Refer to
-// https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/lite/examples/android/app/src/main/java/org/tensorflow/demo/TFLiteObjectDetectionAPIModel.java
+// https://github.com/tensorflow/examples/blob/master/lite/examples/object_detection/android/app/src/main/java/org/tensorflow/lite/examples/detection/tflite/TFLiteObjectDetectionAPIModel.java
 // if it doesn't work.
 
 #include <math.h>
@@ -17,8 +17,8 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
-#include <tensorflow/contrib/lite/kernels/register.h>
-#include <tensorflow/contrib/lite/model.h>
+#include <tensorflow/lite/kernels/register.h>
+#include <tensorflow/lite/model.h>
 
 #include "test_video.hpp"
 #include "video_encoder.hpp"

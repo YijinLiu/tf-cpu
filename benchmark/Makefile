@@ -95,12 +95,12 @@ run_obj_detect_dldt_model_%: $(TESTDATA)/%_frozen.xml $(BIN)/obj_detect_dldt
 	@echo -e "\e[0;92mRunning $* ...\e[0m"
 	@mkdir -p $*_dldt
 	$(BIN)/obj_detect_dldt \
-	    --model $(TESTDATA)/$*_frozen --plugin_dir /usr/local/dldt_plugins --device=CPU \
+	    --model $(TESTDATA)/$*_frozen --device=CPU \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
 	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg \
 	    --output_dir=$*_dldt --logtostderr -v=$(VLOG_LEVEL)
 	$(BIN)/obj_detect_dldt \
-	    --model $(TESTDATA)/$*_frozen --plugin_dir /usr/local/dldt_plugins --device=CPU \
+	    --model $(TESTDATA)/$*_frozen --device=CPU \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
 	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_dldt --logtostderr -v=$(VLOG_LEVEL)
 
@@ -219,7 +219,9 @@ $(BIN)/obj_detect_dldt.o: obj_detect_dldt.cc test_video.hpp video_encoder.hpp ut
 
 $(BIN)/obj_detect_dldt: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_dldt.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -linference_engine_s -lpugixml -lcpu_extension $(OPENCV_LDFLAGS) $(LDFLAGS)
+	g++ -o $@ $^ -linference_engine_s -lMKLDNNPlugin_s -linference_engine_s -lfluid -lade \
+		         -lpugixml -Wl,--whole-archive -lie_cpu_extension_s -Wl,--no-whole-archive \
+				 -lmkldnn $(OPENCV_LDFLAGS) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)

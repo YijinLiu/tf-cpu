@@ -2304,7 +2304,67 @@ install_dldt() {
             git submodule update --recursive
         rc=$?
         if [ $rc != 0 ]; then
-            echo -e "${RED}Failed to install dependencies for DLDT inference engine!${NC}"
+            echo -e "${RED}Failed to download sub modules for DLDT inference engine!${NC}"
+            return 1
+        fi
+        sudo patch -l -p1 <<-EOD
+diff --git a/include/details/ie_so_pointer.hpp b/include/details/ie_so_pointer.hpp
+index a6d7372..15a9028 100644
+--- a/include/details/ie_so_pointer.hpp
++++ b/include/details/ie_so_pointer.hpp
+@@ -91,6 +91,8 @@ public:
+             SymbolLoader<Loader>(_so_loader).template instantiateSymbol<T>(SOCreatorTrait<T>::name))) {
+     }
+ 
++    explicit SOPointer(T* ptr) : _pointedObj(details::shared_from_irelease(ptr)) {}
++
+     /**
+     * @brief The copy-like constructor, can create So Pointer that dereferenced into child type if T is derived of U
+     * @param that copied SOPointer object
+@@ -118,7 +120,7 @@ public:
+     }
+ 
+     explicit operator bool() const noexcept {
+-        return (nullptr != _so_loader) && (nullptr != _pointedObj);
++        return (nullptr != _pointedObj);
+     }
+ 
+     friend bool operator == (std::nullptr_t, const SOPointer& ptr) noexcept {
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index aad2b5b..2683f5c 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -35,6 +35,7 @@ endfunction()
+ 
+ add_subdirectory(extension EXCLUDE_FROM_ALL)
+ add_library(IE::ie_cpu_extension ALIAS ie_cpu_extension)
++add_library(IE::ie_cpu_extension_s ALIAS ie_cpu_extension_s)
+ 
+ file(GLOB_RECURSE EXTENSION_SOURCES extension/*.cpp extension/*.hpp extension/*.h)
+ add_cpplint_target(ie_cpu_extension_cpplint FOR_SOURCES \${EXTENSION_SOURCES})
+diff --git a/src/extension/CMakeLists.txt b/src/extension/CMakeLists.txt
+index 19e7573..d824651 100644
+--- a/src/extension/CMakeLists.txt
++++ b/src/extension/CMakeLists.txt
+@@ -54,6 +54,14 @@ set_target_properties(\${TARGET_NAME} PROPERTIES COMPILE_PDB_NAME \${TARGET_NAME})
+ 
+ set_target_cpu_flags(\${TARGET_NAME})
+ 
++
++add_library(\${TARGET_NAME}_s STATIC \${SRC} \${HDR})
++set_ie_threading_interface_for(\${TARGET_NAME}_s)
++target_include_directories(\${TARGET_NAME}_s PUBLIC \${CMAKE_CURRENT_SOURCE_DIR})
++set_target_properties(\${TARGET_NAME}_s PROPERTIES COMPILE_PDB_NAME \${TARGET_NAME}_s)
++set_target_cpu_flags(\${TARGET_NAME}_s)
++
+ if (IE_MAIN_SOURCE_DIR)
+     export(TARGETS \${TARGET_NAME} NAMESPACE IE:: APPEND FILE "\${CMAKE_BINARY_DIR}/targets.cmake")
++    export(TARGETS \${TARGET_NAME}_s NAMESPACE IE:: APPEND FILE "\${CMAKE_BINARY_DIR}/targets.cmake")
+ endif()
+EOD
+        rc=$?
+        if [ $rc != 0 ]; then
+            echo -e "${RED}Failed to patch DLDT inference engine!${NC}"
             return 1
         fi
     else
@@ -2322,7 +2382,7 @@ install_dldt() {
         return 1
     fi
     cd ..
-    mkdir -p $prefix/include $prefix/lib $prefix/dldt_plugins &&
+    sudo mkdir -p $prefix/include $prefix/lib/dldt_ie_plugins &&
     sudo cp -r include $prefix/include/dldt &&
     sudo cp src/extension/ext_list.hpp $prefix/include/dldt &&
     sudo cp bin/intel64/Release/lib/libinference_engine_s.a \
@@ -2337,7 +2397,7 @@ install_dldt() {
     sudo cp bin/intel64/Release/lib/libclDNNPlugin.so \
             bin/intel64/Release/lib/libGNAPlugin.so \
             bin/intel64/Release/lib/libHeteroPlugin.so \
-            bin/intel64/Release/lib/libMKLDNNPlugin.so $prefix/dldt_plugins
+            bin/intel64/Release/lib/libMKLDNNPlugin.so $prefix/lib/dldt_ie_plugins
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to install inference engine!${NC}"

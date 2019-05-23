@@ -220,8 +220,8 @@ $(BIN)/obj_detect_dldt.o: obj_detect_dldt.cc test_video.hpp video_encoder.hpp ut
 $(BIN)/obj_detect_dldt: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_dldt.o
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -linference_engine_s -lMKLDNNPlugin_s -linference_engine_s -lfluid -lade \
-		         -lpugixml -Wl,--whole-archive -lie_cpu_extension_s -Wl,--no-whole-archive \
-				 -lmkldnn $(OPENCV_LDFLAGS) $(LDFLAGS)
+	             -lpugixml -Wl,--whole-archive -lie_cpu_extension_s -Wl,--no-whole-archive \
+	             -lmkldnn $(OPENCV_LDFLAGS) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)
@@ -255,8 +255,8 @@ $(TESTDATA)/ssdlite_mobilenet_v2_coco.config:
 $(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.xml: $(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.pb \
                                                              $(TESTDATA)/ssdlite_mobilenet_v2_coco.config
 	/usr/local/model-optimizer/mo_tf.py --input_model $< --output_dir $(TESTDATA) \
-		--tensorflow_use_custom_operations_config /usr/local/model-optimizer/extensions/front/tf/ssd_v2_support.json \
-		--tensorflow_object_detection_api_pipeline_config $(TESTDATA)/ssdlite_mobilenet_v2_coco.config
+	    --tensorflow_use_custom_operations_config /usr/local/model-optimizer/extensions/front/tf/ssd_v2_support.json \
+	    --tensorflow_object_detection_api_pipeline_config $(TESTDATA)/ssdlite_mobilenet_v2_coco.config
 
 $(TESTDATA)/ssdlite_mobilenet_v2_coco10_frozen.pb: $(PROJECT_ROOT)/models/objdetect/coco10.pb
 	cp $< $@

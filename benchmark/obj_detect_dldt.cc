@@ -1,3 +1,8 @@
+// Run object detection model using DLDT.
+// NOTE: Though Intel claims it supports any input size using reshape, it actually won't work:
+// - The accuracy is bad, may completely miss detection when the input size is not 300x300
+// - Very slow when the input size is big.
+
 #include <time.h>
 
 #include <algorithm>
@@ -118,7 +123,7 @@ InferencePlugin StaticLinkedCpuPlugin() {
     IInferencePlugin* impl = nullptr;
     ResponseDesc desc;
     const StatusCode code = CreatePluginEngine(impl, &desc);
-    if (code != OK) THROW_IE_EXCEPTION << desc.msg;
+    if (code != StatusCode::OK) THROW_IE_EXCEPTION << desc.msg;
     return InferencePlugin(InferenceEnginePluginPtr(impl));
 }
 
@@ -297,12 +302,14 @@ class ObjDetector {
         return true;
     }
 
-    bool RunImage(const std::string& file_name, const std::string& output) {
+    bool RunImage(const std::string& file_name, size_t height, size_t width,
+                  const std::string& output) {
         cv::Mat mat = cv::imread(file_name);
         if (mat.empty()) {
             VLOG(-1) << "Failed to read image " << file_name;
             return false;
         }
+        if (height > 0 && width > 0) cv::resize(mat, mat, cv::Size(width, height));
         InitNetwork(1, mat.rows, mat.cols);
         FeedInMat(mat, 0);
         const auto start = std::chrono::high_resolution_clock::now();
@@ -466,7 +473,8 @@ int main(int argc, char *argv[]) {
                               FLAGS_output_video);
     } else if (!FLAGS_image_files.empty()) {
         for (const std::string& img_file : split(FLAGS_image_files, ',')) {
-            obj_detector.RunImage(img_file, FLAGS_output_dir + "/" + filename_base(img_file));
+            obj_detector.RunImage(img_file, FLAGS_height, FLAGS_width,
+                                  FLAGS_output_dir + "/" + filename_base(img_file));
         }
     }
 }

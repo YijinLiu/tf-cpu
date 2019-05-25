@@ -28,8 +28,8 @@ DEFINE_bool(is_quantized_model, false, "");
 DEFINE_string(labels_file, "", "");
 
 DEFINE_string(video_file, "", "");
-DEFINE_string(image_file, "", "");
-DEFINE_string(output, "", "");
+DEFINE_string(image_files, "", "Comma separated image files");
+DEFINE_string(output_dir, ".", "");
 DEFINE_bool(output_video, true, "");
 DEFINE_int32(batch_size, 1, "");
 
@@ -363,6 +363,19 @@ class ObjDetector {
     TfLiteTensor* num_detections_ = nullptr;
 };
 
+std::vector<std::string> split(const std::string& s, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream token_stream(s);
+    while (std::getline(token_stream, token, delimiter)) tokens.push_back(token);
+    return tokens;
+}
+
+std::string filename_base(const std::string& filename) {
+    std::string filename_copy(filename);
+    return basename(filename_copy.data());
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -376,16 +389,18 @@ int main(int argc, char** argv) {
     ObjDetector obj_detector;
     if (!obj_detector.Init(FLAGS_model_file, FLAGS_is_quantized_model, labels)) return 1;
     if (!FLAGS_video_file.empty()) {
-        obj_detector.RunVideo(FLAGS_video_file, FLAGS_batch_size, FLAGS_output, FLAGS_output_video);
-    } else if (!FLAGS_image_file.empty()) {
-        obj_detector.RunImage(FLAGS_image_file, FLAGS_output);
+        obj_detector.RunVideo(FLAGS_video_file, FLAGS_batch_size,
+                              FLAGS_output_dir + "/" + filename_base(FLAGS_video_file),
+                              FLAGS_output_video);
+    } else if (!FLAGS_image_files.empty()) {
+        for (const std::string& img_file : split(FLAGS_image_files, ',')) {
+            obj_detector.RunImage(img_file, FLAGS_output_dir + "/" + filename_base(img_file));
+        }
     }
 }
 
 /*
-1. Intel(R) Core(TM) i3-4130 CPU @ 3.40GHz
-beach.ssdlite_mobilenet_v2_coco10_lite.mkv: 290 300x300 frames processed in 14515 ms(50 mspf).
-
-2. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
-beach.ssdlite_mobilenet_v2_coco10_lite.mkv: 290 300x300 frames processed in 10177 ms(35 mspf).
+1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
+ssdlite_mobilenet_v2_coco10_lite/beach.mkv: 290 300x300 frames processed in 37131 ms(128 mspf)
+ssdlite_mobilenet_v2_mixed_lite/beach.mkv: 290 300x300 frames processed in 37424 ms(129 mspf).
 */

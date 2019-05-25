@@ -203,6 +203,8 @@ class ObjDetector {
                 VLOG(-1) << "Expected 7 output items, got " << object_size;
                 return false;
             }
+            VLOG(1) << "Output dims: " << output_dims[0] << "x" << output_dims[1] << "x"
+                    << output_dims[2] << "x" << output_dims[3];
             output_info->setPrecision(Precision::FP32);
         } catch (const std::exception& error) {
             VLOG(-1) << error.what();
@@ -397,9 +399,8 @@ class ObjDetector {
             const auto image_id = static_cast<int>(detection[0]);
             if (image_id < 0) break;
             const int cls = static_cast<int>(detection[1]);
-            if (cls == 0) continue;
             const float score = detection[2];
-            if (score < .51f) break;
+            if (cls == 0 || score < .51f) continue;
             const auto xmin = static_cast<int>(detection[3] * mat.cols);
             const auto ymin = static_cast<int>(detection[4] * mat.rows);
             const auto xmax = static_cast<int>(detection[5] * mat.cols);
@@ -481,4 +482,6 @@ int main(int argc, char *argv[]) {
 
 /*
 1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
-ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 300x300 frames processed in 6380 ms(22 mspf).*/
+ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 300x300 frames processed in 6380 ms(22 mspf).
+ssdlite_mobilenet_v2_mixed_dldt/beach.mkv: 290 300x300 frames processed in 4640 ms(16 mspf).
+*/

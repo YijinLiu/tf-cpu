@@ -5,6 +5,7 @@ PROJECT_ROOT:=$(shell readlink -f $(dir $(lastword $(MAKEFILE_LIST)))/..)
 SRC:=$(PROJECT_ROOT)/benchmark
 BIN:=$(PROJECT_ROOT)/benchmark/bin
 TESTDATA:=$(PROJECT_ROOT)/benchmark/testdata
+VLOG_LEVEL?=-1
 
 all: run_classify_lite run_obj_detect_lite run_classify run_obj_detect run_obj_detect_dldt
 
@@ -40,23 +41,6 @@ run_classify_lite: $(BIN)/classify_lite \
                    $(TESTDATA)/mobilenet_labels.txt
 	$(BIN)/classify_lite
 
-run_obj_detect_lite: $(BIN)/obj_detect_lite
-	@echo -e "\e[0;92mRunning ssdlite_mobilenet_v2_coco10_lite ...\e[0m"
-	$(BIN)/obj_detect_lite \
-	    --image_file=$(TESTDATA)/dogs.jpeg --output=dogs.ssdlite_mobilenet_v2_coco10_lite.jpeg \
-	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.tflite \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
-	$(BIN)/obj_detect_lite \
-	    --image_file=$(TESTDATA)/beach.jpeg --output=beach.ssdlite_mobilenet_v2_coco10_lite.jpeg \
-	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.tflite \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
-	$(BIN)/obj_detect_lite \
-	    --video_file=$(TESTDATA)/beach.mkv --output=beach.ssdlite_mobilenet_v2_coco10_lite.mkv \
-	    --model_file=$(PROJECT_ROOT)/models/objdetect/coco10.tflite \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/coco10_labels.txt
-
-VLOG_LEVEL?=-1
-
 run_classify: $(BIN)/classify \
               $(TESTDATA)/mobilenet_v1_1.0_224_quant_frozen.pb \
               $(TESTDATA)/mobilenet_v1_1.0_192_quant_frozen.pb \
@@ -89,10 +73,11 @@ run_classify: $(BIN)/classify \
               $(TESTDATA)/mobilenet_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/classify
 
-run_obj_detect_dldt: run_obj_detect_dldt_model_ssdlite_mobilenet_v2_coco_2018_05_09
+run_obj_detect_dldt: run_obj_detect_dldt_model_ssdlite_mobilenet_v2_coco_2018_05_09 \
+                     run_obj_detect_dldt_model_ssdlite_mobilenet_v2_mixed
 
-run_obj_detect_dldt_model_%: $(TESTDATA)/%_frozen.xml $(BIN)/obj_detect_dldt
-	@echo -e "\e[0;92mRunning $* ...\e[0m"
+run_obj_detect_dldt_model_%: $(TESTDATA)/%_frozen.xml $(TESTDATA)/%_frozen.bin $(BIN)/obj_detect_dldt
+	@echo -e "\e[0;92mRunning $*_dldt ...\e[0m"
 	@mkdir -p $*_dldt
 	$(BIN)/obj_detect_dldt \
 	    --model $(TESTDATA)/$*_frozen --device=CPU \
@@ -103,6 +88,20 @@ run_obj_detect_dldt_model_%: $(TESTDATA)/%_frozen.xml $(BIN)/obj_detect_dldt
 	    --model $(TESTDATA)/$*_frozen --device=CPU \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
 	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_dldt --logtostderr -v=$(VLOG_LEVEL)
+
+run_obj_detect_lite: run_obj_detect_lite_model_ssdlite_mobilenet_v2_coco10 \
+                     run_obj_detect_lite_model_ssdlite_mobilenet_v2_mixed
+
+run_obj_detect_lite_model_%: $(TESTDATA)/%.tflite $(BIN)/obj_detect_lite
+	@echo -e "\e[0;92mRunning $*_lite ...\e[0m"
+	@mkdir -p $*_lite
+	$(BIN)/obj_detect_lite \
+	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg \
+		--output_dir=$*_lite --model_file=$< -v=$(VLOG_LEVEL) \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
+	$(BIN)/obj_detect_lite \
+	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_lite --model_file=$< -v=$(VLOG_LEVEL) \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 
 run_obj_detect: run_obj_detect_model_ssd_mobilenet_v1_coco_2017_11_17 \
                 run_obj_detect_model_ssd_mobilenet_v2_coco_2018_03_29 \
@@ -258,10 +257,22 @@ $(TESTDATA)/ssdlite_mobilenet_v2_coco_2018_05_09_frozen.xml: $(TESTDATA)/ssdlite
 	    --tensorflow_use_custom_operations_config /usr/local/model-optimizer/extensions/front/tf/ssd_v2_support.json \
 	    --tensorflow_object_detection_api_pipeline_config $(TESTDATA)/ssdlite_mobilenet_v2_coco.config
 
+$(TESTDATA)/ssdlite_mobilenet_v2_coco10.tflite: $(PROJECT_ROOT)/models/objdetect/coco10.tflite
+	cp $< $@
+
+$(TESTDATA)/ssdlite_mobilenet_v2_mixed.tflite: $(PROJECT_ROOT)/models/objdetect/mixed.tflite
+	cp $< $@
+
 $(TESTDATA)/ssdlite_mobilenet_v2_coco10_frozen.pb: $(PROJECT_ROOT)/models/objdetect/coco10.pb
 	cp $< $@
 
 $(TESTDATA)/ssdlite_mobilenet_v2_mixed_frozen.pb: $(PROJECT_ROOT)/models/objdetect/mixed.pb
+	cp $< $@
+
+$(TESTDATA)/ssdlite_mobilenet_v2_mixed_frozen.xml: $(PROJECT_ROOT)/models/objdetect/mixed.xml
+	cp $< $@
+
+$(TESTDATA)/ssdlite_mobilenet_v2_mixed_frozen.bin: $(PROJECT_ROOT)/models/objdetect/mixed.bin
 	cp $< $@
 
 $(TESTDATA)/%_frozen.pb: $(PROJECT_ROOT)/models/objdetect/%.tar.gz

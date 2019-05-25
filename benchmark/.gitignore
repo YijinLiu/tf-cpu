@@ -4,10 +4,14 @@
 mobilenet_labels.txt
 face_labels.txt
 mnist_data
+testdata
 ssd_mobilenet_v1_coco_2017_11_17/
 ssd_mobilenet_v1_fpn_shared_box_predictor_640x640_coco14_sync_2018_07_03/
 ssd_mobilenet_v2_coco_2018_03_29/
-ssdlite_mobilenet_v2_coco10/
 ssdlite_mobilenet_v2_coco_2018_05_09/
-ssdlite_mobilenet_v2_mixed/
 ssdlite_mobilenet_v2_coco_2018_05_09_dldt/
+ssdlite_mobilenet_v2_coco10/
+ssdlite_mobilenet_v2_coco10_lite/
+ssdlite_mobilenet_v2_mixed/
+ssdlite_mobilenet_v2_mixed_dldt/
+ssdlite_mobilenet_v2_mixed_lite/

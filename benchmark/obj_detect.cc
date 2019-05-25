@@ -374,10 +374,9 @@ class ObjDetector {
         const float* detection_scores = TensorData<float>(output_tensors[2], batch_index);
         const float* detection_boxes = TensorData<float>(output_tensors[3], batch_index);
         for (int i = 0; i < num_detections; i++) {
-            const float score = detection_scores[i];
-            if (score < .51f) break;
             const int cls = detection_classes[i];
-            if (cls == 0) continue;
+            const float score = detection_scores[i];
+            if (cls == 0 || score < 0.51f) continue;
             const int ymin = detection_boxes[4 * i] * mat.rows;
             const int xmin = detection_boxes[4 * i + 1] * mat.cols;
             const int ymax = detection_boxes[4 * i + 2] * mat.rows;
@@ -437,7 +436,8 @@ int main(int argc, char** argv) {
 
 /*
 1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
-ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 320x180 frames processed in 30956 ms(106 mspf).
-ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 300x300 frames processed in 21592 ms(74 mspf).
-ssdlite_mobilenet_v2_mixed/beach.mkv: 290 300x300 frames processed in 13702 ms(47 mspf).
+ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 300x300 frames processed in 27263 ms(94 mspf).
+ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 300x300 frames processed in 30557 ms(105 mspf).
+ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 300x300 frames processed in 18810 ms(64 mspf).
+ssdlite_mobilenet_v2_mixed/beach.mkv: 290 300x300 frames processed in 11167 ms(38 mspf).
 */

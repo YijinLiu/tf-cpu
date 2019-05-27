@@ -16,8 +16,8 @@ usage() {
 }
 
 blas=MKL
-version=2.0.0-alpha0
-bazel_version=0.19.2
+version=1.14.0-rc0
+bazel_version=0.25.3
 prefix=/usr/local
 # Use "gcc -march=native -Q --help=target" to see which options are enabled.
 mopts="-march=native"
@@ -88,7 +88,7 @@ install_headers() {
 
 install_abseil_cpp() {
     # See tensorflow/workspace.bzl for the tag in use.
-    abseil_tag=111ca7060a6ff50115ca85b59f6b5d8c8c5e9105
+    abseil_tag=daf381e8535a1f1f1b8a75966a74e7cca63dee89
     if [ ! -d "abseil-cpp-${abseil_tag}" ]; then
         wget -O - https://github.com/abseil/abseil-cpp/archive/${abseil_tag}.tar.gz | tar xvzf -
         rc=$?
@@ -102,55 +102,90 @@ install_abseil_cpp() {
     cd build
     cmake .. && make &&
     ar -r libabsl.a \
-        absl/base/CMakeFiles/absl_base.dir/internal/cycleclock.cc.o \
-        absl/base/CMakeFiles/absl_base.dir/internal/raw_logging.cc.o \
-        absl/base/CMakeFiles/absl_base.dir/internal/spinlock.cc.o \
-        absl/base/CMakeFiles/absl_base.dir/internal/sysinfo.cc.o \
-        absl/base/CMakeFiles/absl_base.dir/internal/thread_identity.cc.o \
-        absl/base/CMakeFiles/absl_base.dir/internal/unscaledcycleclock.cc.o \
-        absl/base/CMakeFiles/absl_dynamic_annotations.dir/dynamic_annotations.cc.o \
-        absl/base/CMakeFiles/absl_internal_spinlock_wait.dir/internal/spinlock_wait.cc.o \
-        absl/base/CMakeFiles/absl_internal_throw_delegate.dir/internal/throw_delegate.cc.o \
-        absl/debugging/CMakeFiles/absl_stacktrace.dir/stacktrace.cc.o \
-        absl/debugging/CMakeFiles/absl_leak_check.dir/leak_check.cc.o \
-        absl/debugging/CMakeFiles/absl_symbolize.dir/symbolize.cc.o \
-        absl/hash/CMakeFiles/absl_hash.dir/internal/hash.cc.o \
-        absl/hash/CMakeFiles/absl_internal_city.dir/internal/city.cc.o \
-        absl/numeric/CMakeFiles/absl_int128.dir/int128.cc.o \
-        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/arg.cc.o \
-        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/bind.cc.o \
-        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/extension.cc.o \
-        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/float_conversion.cc.o \
-        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/output.cc.o \
-        absl/strings/CMakeFiles/absl_internal_str_format_internal.dir/internal/str_format/parser.cc.o \
-        absl/strings/CMakeFiles/absl_internal_strings_internal.dir/internal/utf8.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/ascii.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/charconv.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/escaping.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/internal/charconv_bigint.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/internal/charconv_parse.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/internal/memutil.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/match.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/numbers.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/str_cat.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/str_replace.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/str_split.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/string_view.cc.o \
-        absl/strings/CMakeFiles/absl_strings.dir/substitute.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/time.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/clock.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/duration.cc.o \
-        absl/time/CMakeFiles/absl_time.dir/format.cc.o \
-        absl/synchronization/CMakeFiles/absl_synchronization.dir/barrier.cc.o \
-        absl/synchronization/CMakeFiles/absl_synchronization.dir/blocking_counter.cc.o \
-        absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/create_thread_identity.cc.o \
-        absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/per_thread_sem.cc.o \
-        absl/synchronization/CMakeFiles/absl_synchronization.dir/internal/waiter.cc.o \
-        absl/synchronization/CMakeFiles/absl_synchronization.dir/notification.cc.o \
-        absl/synchronization/CMakeFiles/absl_synchronization.dir/mutex.cc.o \
-        absl/debugging/CMakeFiles/absl_failure_signal_handler.dir/failure_signal_handler.cc.o \
-        absl/types/CMakeFiles/absl_bad_optional_access.dir/bad_optional_access.cc.o \
-        absl/types/CMakeFiles/absl_optional.dir/optional.cc.o
+        absl/time/CMakeFiles/civil_time.dir/internal/cctz/src/civil_time_detail.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/time_zone_lookup.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/zone_info_source.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/time_zone_impl.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/time_zone_libc.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/time_zone_info.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/time_zone_format.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/time_zone_posix.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/time_zone_fixed.cc.o \
+        absl/time/CMakeFiles/time_zone.dir/internal/cctz/src/time_zone_if.cc.o \
+        absl/time/CMakeFiles/time.dir/time.cc.o \
+        absl/time/CMakeFiles/time.dir/format.cc.o \
+        absl/time/CMakeFiles/time.dir/duration.cc.o \
+        absl/time/CMakeFiles/time.dir/civil_time.cc.o \
+        absl/time/CMakeFiles/time.dir/clock.cc.o \
+        absl/hash/CMakeFiles/hash.dir/internal/hash.cc.o \
+        absl/hash/CMakeFiles/city.dir/internal/city.cc.o \
+        absl/flags/CMakeFiles/flags_marshalling.dir/marshalling.cc.o \
+        absl/flags/CMakeFiles/flags_parse.dir/parse.cc.o \
+        absl/flags/CMakeFiles/flags_internal.dir/internal/program_name.cc.o \
+        absl/flags/CMakeFiles/flags_handle.dir/internal/commandlineflag.cc.o \
+        absl/flags/CMakeFiles/flags_config.dir/usage_config.cc.o \
+        absl/flags/CMakeFiles/flags_usage.dir/internal/usage.cc.o \
+        absl/flags/CMakeFiles/flags_registry.dir/internal/type_erased.cc.o \
+        absl/flags/CMakeFiles/flags_registry.dir/internal/registry.cc.o \
+        absl/flags/CMakeFiles/flags.dir/flag.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/extension.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/bind.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/arg.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/parser.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/float_conversion.cc.o \
+        absl/strings/CMakeFiles/str_format_internal.dir/internal/str_format/output.cc.o \
+        absl/strings/CMakeFiles/strings.dir/str_split.cc.o \
+        absl/strings/CMakeFiles/strings.dir/ascii.cc.o \
+        absl/strings/CMakeFiles/strings.dir/match.cc.o \
+        absl/strings/CMakeFiles/strings.dir/internal/memutil.cc.o \
+        absl/strings/CMakeFiles/strings.dir/internal/charconv_parse.cc.o \
+        absl/strings/CMakeFiles/strings.dir/internal/charconv_bigint.cc.o \
+        absl/strings/CMakeFiles/strings.dir/substitute.cc.o \
+        absl/strings/CMakeFiles/strings.dir/string_view.cc.o \
+        absl/strings/CMakeFiles/strings.dir/numbers.cc.o \
+        absl/strings/CMakeFiles/strings.dir/escaping.cc.o \
+        absl/strings/CMakeFiles/strings.dir/str_replace.cc.o \
+        absl/strings/CMakeFiles/strings.dir/str_cat.cc.o \
+        absl/strings/CMakeFiles/strings.dir/charconv.cc.o \
+        absl/strings/CMakeFiles/strings_internal.dir/internal/ostringstream.cc.o \
+        absl/strings/CMakeFiles/strings_internal.dir/internal/utf8.cc.o \
+        absl/debugging/CMakeFiles/leak_check_disable.dir/leak_check_disable.cc.o \
+        absl/debugging/CMakeFiles/examine_stack.dir/internal/examine_stack.cc.o \
+        absl/debugging/CMakeFiles/symbolize.dir/symbolize.cc.o \
+        absl/debugging/CMakeFiles/leak_check.dir/leak_check.cc.o \
+        absl/debugging/CMakeFiles/debugging_internal.dir/internal/vdso_support.cc.o \
+        absl/debugging/CMakeFiles/debugging_internal.dir/internal/elf_mem_image.cc.o \
+        absl/debugging/CMakeFiles/debugging_internal.dir/internal/address_is_readable.cc.o \
+        absl/debugging/CMakeFiles/demangle_internal.dir/internal/demangle.cc.o \
+        absl/debugging/CMakeFiles/failure_signal_handler.dir/failure_signal_handler.cc.o \
+        absl/debugging/CMakeFiles/stacktrace.dir/stacktrace.cc.o \
+        absl/types/CMakeFiles/bad_any_cast_impl.dir/bad_any_cast.cc.o \
+        absl/types/CMakeFiles/bad_optional_access.dir/bad_optional_access.cc.o \
+        absl/types/CMakeFiles/bad_variant_access.dir/bad_variant_access.cc.o \
+        absl/synchronization/CMakeFiles/synchronization.dir/internal/per_thread_sem.cc.o \
+        absl/synchronization/CMakeFiles/synchronization.dir/internal/waiter.cc.o \
+        absl/synchronization/CMakeFiles/synchronization.dir/internal/create_thread_identity.cc.o \
+        absl/synchronization/CMakeFiles/synchronization.dir/mutex.cc.o \
+        absl/synchronization/CMakeFiles/synchronization.dir/blocking_counter.cc.o \
+        absl/synchronization/CMakeFiles/synchronization.dir/barrier.cc.o \
+        absl/synchronization/CMakeFiles/synchronization.dir/notification.cc.o \
+        absl/synchronization/CMakeFiles/graphcycles_internal.dir/internal/graphcycles.cc.o \
+        absl/base/CMakeFiles/throw_delegate.dir/internal/throw_delegate.cc.o \
+        absl/base/CMakeFiles/dynamic_annotations.dir/dynamic_annotations.cc.o \
+        absl/base/CMakeFiles/base.dir/internal/unscaledcycleclock.cc.o \
+        absl/base/CMakeFiles/base.dir/internal/thread_identity.cc.o \
+        absl/base/CMakeFiles/base.dir/internal/spinlock.cc.o \
+        absl/base/CMakeFiles/base.dir/internal/cycleclock.cc.o \
+        absl/base/CMakeFiles/base.dir/internal/sysinfo.cc.o \
+        absl/base/CMakeFiles/base.dir/internal/raw_logging.cc.o \
+        absl/base/CMakeFiles/base.dir/log_severity.cc.o \
+        absl/base/CMakeFiles/spinlock_wait.dir/internal/spinlock_wait.cc.o \
+        absl/base/CMakeFiles/scoped_set_env.dir/internal/scoped_set_env.cc.o \
+        absl/base/CMakeFiles/malloc_internal.dir/internal/low_level_alloc.cc.o \
+        absl/numeric/CMakeFiles/int128.dir/int128.cc.o \
+        absl/container/CMakeFiles/raw_hash_set.dir/internal/raw_hash_set.cc.o \
+        absl/container/CMakeFiles/hashtablez_sampler.dir/internal/hashtablez_sampler.cc.o \
+        absl/container/CMakeFiles/hashtablez_sampler.dir/internal/hashtablez_sampler_force_weak_definition.cc.o
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to build abseil-cpp!${NC}"
@@ -226,8 +261,8 @@ install_openblas() {
 # Visit https://software.seek.intel.com/performance-libraries
 # to find latest versions of MKL and IPP.
 install_mkl() {
-    prid="15275"
-    ver="2019.3.199"
+    prid="15540"
+    ver="2019.4.243"
     if [ ! -d "l_mkl_${ver}" ]; then
         if [ ! -f "l_mkl_${ver}.tgz" ]; then
             wget http://registrationcenter-download.intel.com/akdlm/irc_nas/tec/${prid}/l_mkl_${ver}.tgz
@@ -284,10 +319,10 @@ install_mkldnn() {
         cd mkl-dnn
         patch -l -p1 <<- EOD
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a80af75..29f3a38 100644
+index 5929909..6244d1b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -66,7 +66,6 @@ set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
+@@ -73,7 +73,6 @@ include(CMakePackageConfigHelpers)
  
  include("cmake/utils.cmake")
  include("cmake/options.cmake")
@@ -296,18 +331,16 @@ index a80af75..29f3a38 100644
  include("cmake/platform.cmake")
  include("cmake/SDL.cmake")
 diff --git a/cmake/MKL.cmake b/cmake/MKL.cmake
-index bb02059..ea1b092 100644
+index c404c17..d54b24e 100644
 --- a/cmake/MKL.cmake
 +++ b/cmake/MKL.cmake
-@@ -18,258 +18,14 @@
- # \${CMAKE_CURRENT_SOURCE_DIR}/external
- #===============================================================================
+@@ -22,279 +22,17 @@ if(MKL_cmake_included)
+     return()
+ endif()
+ set(MKL_cmake_included true)
+-include("cmake/utils.cmake")
+-include("cmake/options.cmake")
  
--if(MKL_cmake_included)
--    return()
--endif()
--set(MKL_cmake_included true)
--
 -# set SKIP_THIS_MKL to true if given configuration is not supported
 -function(maybe_skip_this_mkl LIBNAME)
 -    # Optimism...
@@ -378,7 +411,8 @@ index bb02059..ea1b092 100644
 -    if (MKLINC AND LIBNAME MATCHES "mklml")
 -        get_filename_component(__mklinc_root "\${MKLINC}" PATH)
 -        find_library(tmp_MKLLIB NAMES "mkl_rt"
--            HINTS \${__mklinc_root}/lib/intel64)
+-            HINTS \${__mklinc_root}/lib/intel64
+-            NO_DEFAULT_PATH)
 -        set_if(tmp_MKLLIB MKLINC "")
 -        unset(tmp_MKLLIB CACHE)
 -    endif()
@@ -404,10 +438,14 @@ index bb02059..ea1b092 100644
 -    endif()
 -
 -    get_filename_component(__mklinc_root "\${MKLINC}" PATH)
+-
+-    unset(MKLLIB CACHE) # make find_library to redo the search
+-    # At first, try to locate Intel MKL in the path where the header was found
 -    find_library(MKLLIB NAMES \${LIBNAME}
--        HINTS   \${MKLROOT}/lib \${MKLROOT}/lib/intel64
--                \$ENV{MKLROOT}/lib \$ENV{MKLROOT}/lib/intel64
--                \${__mklinc_root}/lib \${__mklinc_root}/lib/intel64)
+-        PATHS \${__mklinc_root}/lib \${__mklinc_root}/lib/intel64
+-        NO_DEFAULT_PATH)
+-    # On failure, check the system paths
+-    find_library(MKLLIB NAMES \${LIBNAME})
 -    if(NOT MKLLIB)
 -        return()
 -    endif()
@@ -424,7 +462,8 @@ index bb02059..ea1b092 100644
 -        endif()
 -    endif()
 -
--    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+-    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel"
+-            OR MKLDNN_INSTALL_MODE STREQUAL "BUNDLE")
 -        get_filename_component(MKLLIBPATH \${MKLLIB} PATH)
 -        find_library(MKLIOMP5LIB
 -            NAMES "iomp5" "iomp5md" "libiomp5" "libiomp5md"
@@ -449,37 +488,38 @@ index bb02059..ea1b092 100644
 -        set(MKLIOMP5DLL)
 -    endif()
 -
+-    if(MKLDNN_INSTALL_MODE STREQUAL "BUNDLE"
+-            AND NOT MKLDNN_THREADING STREQUAL "TBB"
+-            AND NOT (MKLDNN_THREADING STREQUAL "OMP:COMP"
+-            AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+-        set(INSTALL_IOMP5 TRUE)
+-    else()
+-        set(INSTALL_IOMP5 FALSE)
+-    endif()
+-
 -    get_filename_component(MKLLIBPATH "\${MKLLIB}" PATH)
 -    string(FIND "\${MKLLIBPATH}" \${CMAKE_CURRENT_SOURCE_DIR}/external __idx)
 -    if(\${__idx} EQUAL 0)
 -        if(WIN32)
--            if(MINGW)
--                # We need to install *.dll into bin/ instead of lib/.
--                install(PROGRAMS \${MKLDLL} DESTINATION bin)
--            else()
--                install(PROGRAMS \${MKLDLL} DESTINATION lib)
--            endif()
+-            install(PROGRAMS \${MKLDLL} \${MKLIOMP5DLL}
+-                DESTINATION \${CMAKE_INSTALL_BINDIR})
 -        else()
--            install(PROGRAMS \${MKLLIB} DESTINATION lib)
+-            install(PROGRAMS \${MKLLIB} \${MKLIOMP5LIB}
+-                DESTINATION \${CMAKE_INSTALL_LIBDIR})
 -        endif()
--        if(MKLIOMP5LIB)
--            if(WIN32)
--                if(MINGW)
--                    # We need to install *.dll into bin/ instead of lib/.
--                    install(PROGRAMS \${MKLIOMP5DLL} DESTINATION bin)
--                else()
--                    install(PROGRAMS \${MKLIOMP5DLL} DESTINATION lib)
--                endif()
--            else()
--                install(PROGRAMS \${MKLIOMP5LIB} DESTINATION lib)
--            endif()
+-    elseif(INSTALL_IOMP5)
+-        if(WIN32)
+-            install(PROGRAMS \${MKLIOMP5DLL} DESTINATION \${CMAKE_INSTALL_BINDIR})
+-            install(PROGRAMS \${MKLIOMP5LIB} DESTINATION \${CMAKE_INSTALL_LIBDIR})
+-        else()
+-            install(PROGRAMS \${MKLIOMP5LIB} DESTINATION \${CMAKE_INSTALL_LIBDIR})
 -        endif()
 -    endif()
 -
 -    if(WIN32)
 -        # Add paths to DLL to %PATH% on Windows
 -        get_filename_component(MKLDLLPATH "\${MKLDLL}" PATH)
--        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}\;\${MKLDLLPATH}")
+-        append_to_windows_path_list(CTESTCONFIG_PATH "\${MKLDLLPATH}")
 -        set(CTESTCONFIG_PATH "\${CTESTCONFIG_PATH}" PARENT_SCOPE)
 -    endif()
 -
@@ -488,6 +528,11 @@ index bb02059..ea1b092 100644
 -    set(MKLINC \${MKLINC} PARENT_SCOPE)
 -    set(MKLLIB "\${MKLLIB}" PARENT_SCOPE)
 -    set(MKLDLL "\${MKLDLL}" PARENT_SCOPE)
+-    if(LIBNAME MATCHES "mklml")
+-        set(MKLDNN_USES_MKL "MKLML:SHARED" PARENT_SCOPE)
+-    else()
+-        set(MKLDNN_USES_MKL "FULL:SHARED" PARENT_SCOPE)
+-    endif()
 -
 -    set(MKLIOMP5LIB "\${MKLIOMP5LIB}" PARENT_SCOPE)
 -    set(MKLIOMP5DLL "\${MKLIOMP5DLL}" PARENT_SCOPE)
@@ -517,20 +562,31 @@ index bb02059..ea1b092 100644
 -    set(MKLLIB "\${MKLLIB}" PARENT_SCOPE)
 -endfunction()
 -
+-set(MKLDNN_USES_MKL "")
 -detect_mkl("mklml_intel")
 -detect_mkl("mklml_gnu")
 -detect_mkl("mklml")
 -detect_mkl("mkl_rt")
--if (MKLDNN_USE_MKL STREQUAL "FULL:STATIC" AND HAVE_MKL)
--    set(MKLDLL "")
--    get_filename_component(MKLLIBPATH "\${MKLLIB}" PATH)
--    set_static_mkl_libs(\${MKLLIBPATH})
--endif ()
 -
 -if(HAVE_MKL)
+-    if(MKLDNN_INSTALL_MODE STREQUAL "BUNDLE"
+-            AND NOT MKLDNN_USE_MKL STREQUAL "FULL:STATIC")
+-        message(FATAL_ERROR "MKL-DNN can only be installed as a bundle with
+-                MKLDNN_USE_MKL set to FULL:STATIC")
+-    endif()
+-
+-    if (MKLDNN_USE_MKL STREQUAL "FULL:STATIC")
+-        set(MKLDLL "")
+-        get_filename_component(MKLLIBPATH "\${MKLLIB}" PATH)
+-        set_static_mkl_libs(\${MKLLIBPATH})
+-        list(APPEND EXTRA_STATIC_LIBS \${MKLLIB})
+-        set(MKLDNN_USES_MKL "FULL:STATIC")
+-    else()
+-        list(APPEND EXTRA_SHARED_LIBS \${MKLLIB})
+-    endif()
+-
 -    add_definitions(-DUSE_MKL -DUSE_CBLAS)
 -    include_directories(AFTER \${MKLINC})
--    list(APPEND mkldnn_LINKER_LIBS \${MKLLIB})
 -
 -    set(MSG "Intel(R) MKL:")
 -    message(STATUS "\${MSG} include \${MKLINC}")
@@ -559,42 +615,53 @@ index bb02059..ea1b092 100644
 -        "https://software.intel.com/en-us/intel-mkl")
 -endif()
 +set(HAVE_MKL TRUE)
-+set(MKLROOT "${prefix}/intel/mkl")
++set(MKLROOT "/usr/local/intel/mkl")
 +set(MKLINC "\${MKLROOT}/include")
++set(MKLDNN_USES_MKL "FULL:STATIC")
 +
-+add_definitions(-DUSE_MKL -DUSE_CBLAS)
++add_definitions(-DUSE_MKL -DUSE_CBLAS -DMKL_DIRECT_CALL_SEQ_JIT)
 +include_directories(AFTER \${MKLINC})
-+list(APPEND EXTRA_LIBS -Wl,--start-group mkl_gf_lp64 mkl_sequential mkl_core -Wl,--end-group pthread dl)
-+SET(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -L${prefix}/intel/mkl/lib")
++list(APPEND EXTRA_STATIC_LIBS -Wl,--start-group mkl_gf_lp64 mkl_sequential mkl_core -Wl,--end-group pthread dl)
++SET(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -L/usr/local/intel/mkl/lib")
 + 
 +set(MSG "Intel(R) MKL:")
 +message(STATUS "\${MSG} include \${MKLINC}")
++message(STATUS "\${MSG} lib \${MKLLIB}")
 diff --git a/cmake/SDL.cmake b/cmake/SDL.cmake
-index b494a0f..0a0f98c 100644
+index c4e0ab4..dd8217e 100644
 --- a/cmake/SDL.cmake
 +++ b/cmake/SDL.cmake
-@@ -23,7 +23,7 @@ endif()
- set(SDL_cmake_included true)
+@@ -24,7 +24,7 @@ set(SDL_cmake_included true)
+ include("cmake/utils.cmake")
  
  if(UNIX)
 -    set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")
 +    set(CMAKE_CCXX_FLAGS "-Wformat -Wformat-security")
-     set(CMAKE_CXX_FLAGS_RELEASE "\${CMAKE_CXX_FLAGS_RELEASE} -D_FORTIFY_SOURCE=2")
-     set(CMAKE_C_FLAGS_RELEASE "\${CMAKE_C_FLAGS_RELEASE} -D_FORTIFY_SOURCE=2")
+     append(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
+     append(CMAKE_C_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
      if("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-@@ -52,7 +52,6 @@ if(UNIX)
-         set(CMAKE_SHARED_LINKER_FLAGS "\${CMAKE_SHARED_LINKER_FLAGS} -Wl,-bind_at_load")
-         set(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -Wl,-bind_at_load")
+@@ -53,7 +53,6 @@ if(UNIX)
+         append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-bind_at_load")
+         append(CMAKE_EXE_LINKER_FLAGS "-Wl,-bind_at_load")
      else()
--        set(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -pie")
-         set(CMAKE_SHARED_LINKER_FLAGS "\${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
-         set(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
+-        append(CMAKE_EXE_LINKER_FLAGS "-pie")
+         append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
+         append(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
      endif()
 diff --git a/cmake/platform.cmake b/cmake/platform.cmake
-index 3597970..1049a93 100644
+index a541215..ae790d2 100644
 --- a/cmake/platform.cmake
 +++ b/cmake/platform.cmake
-@@ -108,7 +108,7 @@ elseif(UNIX OR MINGW)
+@@ -24,8 +24,6 @@ set(platform_cmake_included true)
+ 
+ include("cmake/utils.cmake")
+ 
+-add_definitions(-DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS)
+-
+ # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
+ # C++ standard (see C99 standard 7.18.2 and 7.18.4)
+ add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
+@@ -113,7 +111,7 @@ elseif(UNIX OR MINGW)
          endif()
      elseif("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
          if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
@@ -634,7 +701,7 @@ install_blas() {
 
 install_eigen() {
     # See tensorflow/workspace.bzl for what's the version used by tensorflow.
-    eigen_tag=9f48e814419e
+    eigen_tag=a0d250e79c79
     if [ ! -d "eigen-eigen-$eigen_tag" ]; then
         wget -O - https://bitbucket.org/eigen/eigen/get/${eigen_tag}.tar.gz | tar xzvf -
         rc=$?
@@ -671,7 +738,7 @@ install_protobuf() {
         opts="--with-pic"
     fi
     ./autogen.sh &&
-    ./configure --enable-static --disable-shared $opts --prefix=${prefix} &&
+    ./configure --enable-static --disable-shared $opts --prefix=$prefix &&
     make -j$(nproc) && sudo make install
     rc=$?
     if [ $rc != 0 ]; then
@@ -683,7 +750,7 @@ install_protobuf() {
 
 install_flatbuffers() {
     if [ ! -d "flatbuffers" ]; then
-        git clone --depth=1 https://github.com/google/flatbuffers -b v1.10.0
+        git clone --depth=1 https://github.com/google/flatbuffers -b v1.11.0
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download flatbuffers.${NC}"
@@ -727,7 +794,7 @@ install_gemmlowp() {
 
 install_nsync() {
     if [ ! -d "nsync" ] ; then
-        git clone --depth=1 https://github.com/google/nsync -b 1.20.1
+        git clone --depth=1 https://github.com/google/nsync -b 1.21.0
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download nsync.${NC}"
@@ -792,7 +859,7 @@ install_farmhash() {
 
 install_double_conversion() {
     if [ ! -d "double-conversion" ] ; then
-        git clone --depth=1 https://github.com/google/double-conversion -b v3.1.1
+        git clone --depth=1 https://github.com/google/double-conversion -b v3.1.5
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download double-conversion.${NC}"
@@ -842,7 +909,7 @@ install_bazel() {
             return 1
         fi
     fi
-    sudo dpkg -i bazel_${bazel_version}-linux-x86_64.deb
+    sudo apt install -qq -y --no-install-recommends ./bazel_${bazel_version}-linux-x86_64.deb
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to install Bazel!${NC}"
@@ -850,12 +917,12 @@ install_bazel() {
     fi
 }
 
-mkl_cxxflags="-DENABLE_MKL -DINTEL_MKL -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL -I${prefix}/intel/mkl/include -I${prefix}/intel/mkldnn/include"
-mkl_ldflags="-L${prefix}/intel/mkl/lib -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
+mkl_cxxflags="-DENABLE_MKL -DINTEL_MKL -DEIGEN_USE_MKL_ALL -DMKL_DIRECT_CALL_SEQ_JIT -I$prefix/intel/mkl/include -I$prefix/intel/mkldnn/include"
+mkl_ldflags="-L$prefix/intel/mkl/lib -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group"
 if [ -z "$mkldnn_version" ] ; then
-    mkl_cxxflags="${mkl_cxxflags} -DINTEL_MKL_ML_ONLY"
+    mkl_cxxflags="$mkl_cxxflags -DINTEL_MKL_ML_ONLY"
 else
-    mkl_ldflags="-L${prefix}/intel/mkldnn/lib/ -lmkldnn ${mkl_ldflags}"
+    mkl_ldflags="-L$prefix/intel/mkldnn/lib/ -lmkldnn $mkl_ldflags"
 fi
 
 install_tensorflow() {
@@ -875,7 +942,7 @@ install_tensorflow() {
         fi
         patch -l -p1 <<- EOD
 diff --git a/tensorflow/cc/gradients/math_grad.cc b/tensorflow/cc/gradients/math_grad.cc
-index 1329b56..b65bf88 100644
+index 1329b568..b65bf883 100644
 --- a/tensorflow/cc/gradients/math_grad.cc
 +++ b/tensorflow/cc/gradients/math_grad.cc
 @@ -265,6 +265,16 @@ Status SigmoidGrad(const Scope& scope, const Operation& op,
@@ -896,7 +963,7 @@ index 1329b56..b65bf88 100644
                  const std::vector<Output>& grad_inputs,
                  std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/cc/gradients/nn_grad.cc b/tensorflow/cc/gradients/nn_grad.cc
-index 2a32a2e..2768b20 100644
+index 2a32a2ed..2768b205 100644
 --- a/tensorflow/cc/gradients/nn_grad.cc
 +++ b/tensorflow/cc/gradients/nn_grad.cc
 @@ -125,6 +125,16 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
@@ -917,7 +984,7 @@ index 2a32a2e..2768b20 100644
                        const std::vector<Output>& grad_inputs,
                        std::vector<Output>* grad_outputs) {
 diff --git a/tensorflow/contrib/makefile/Makefile b/tensorflow/contrib/makefile/Makefile
-index 7ea6e34..c53bb55 100644
+index 13f84313..cbea5ba5 100644
 --- a/tensorflow/contrib/makefile/Makefile
 +++ b/tensorflow/contrib/makefile/Makefile
 @@ -81,17 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
@@ -935,7 +1002,7 @@ index 7ea6e34..c53bb55 100644
 --I\$(MAKEFILE_DIR)/downloads/double_conversion \\
 --I\$(MAKEFILE_DIR)/downloads/absl \\
 --I\$(HOST_GENDIR)
-+HOST_INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../.. -I\$(HOST_GENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++HOST_INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../.. -I\$(HOST_GENDIR) -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	HOST_INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
@@ -961,11 +1028,11 @@ index 7ea6e34..c53bb55 100644
 +BLAS?=MKL
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
-+BLAS_CXX_FLAGS/MKL:=${mkl_cxxflags}
-+BLAS_LD_FLAGS/ATLAS:=-L${prefix}/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
-+BLAS_LD_FLAGS/OpenBLAS:=-L${prefix}/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
++BLAS_CXX_FLAGS/MKL:=$mkl_cxxflags
++BLAS_LD_FLAGS/ATLAS:=-L$prefix/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
++BLAS_LD_FLAGS/OpenBLAS:=-L$prefix/OpenBLAS/lib -lopenblas -lgfortran -lquadmath
 +# See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
-+BLAS_LD_FLAGS/MKL:=${mkl_ldflags}
++BLAS_LD_FLAGS/MKL:=$mkl_ldflags
 +
  # Settings for the target compiler.
  CXX := \$(CC_PREFIX) gcc
@@ -981,7 +1048,7 @@ index 7ea6e34..c53bb55 100644
 -LDFLAGS := \\
 --L/usr/local/lib
 +CXXFLAGS := --std=c++11 -g1 -DIS_SLIM_BUILD -fexceptions -DNDEBUG \$(OPTFLAGS)
-+LDFLAGS := -L${prefix}/lib
++LDFLAGS := -L$prefix/lib
  DEPFLAGS = -MT \$@ -MMD -MP -MF \$(DEPDIR)/\$*.Td
  
 -INCLUDES := \\
@@ -995,7 +1062,7 @@ index 7ea6e34..c53bb55 100644
 --I\$(MAKEFILE_DIR)/downloads/absl \\
 --I\$(PROTOGENDIR) \\
 --I\$(PBTGENDIR)
-+INCLUDES := -I. -I\$(PROTOGENDIR) -Ibazel-genfiles -I\$(PBTGENDIR) -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
++INCLUDES := -I. -I\$(PROTOGENDIR) -Ibazel-genfiles -I\$(PBTGENDIR) -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	INCLUDES += -I\$(MAKEFILE_DIR)/gen/protobuf-host/include
  endif
@@ -1030,23 +1097,23 @@ index 7ea6e34..c53bb55 100644
  -lgnustl_static \\
  -lprotobuf \\
  -llog \\
-@@ -629,7 +605,6 @@ BENCHMARK_NAME := \$(BINDIR)benchmark
+@@ -633,7 +609,6 @@ BENCHMARK_NAME := \$(BINDIR)benchmark
  # gen_file_lists.sh script.
  
  CORE_CC_ALL_SRCS := \\
 -\$(ABSL_CC_SRCS) \\
- \$(wildcard tensorflow/core/*.cc) \\
- \$(wildcard tensorflow/core/common_runtime/*.cc) \\
- \$(wildcard tensorflow/core/framework/*.cc) \\
-@@ -642,7 +617,6 @@ \$(wildcard tensorflow/core/platform/*/*.cc) \\
+ tensorflow/c/c_api.cc \\
+ tensorflow/c/kernels.cc \\
+ tensorflow/c/tf_status_helper.cc \\
+@@ -649,7 +624,6 @@ \$(wildcard tensorflow/core/platform/*/*.cc) \\
  \$(wildcard tensorflow/core/platform/*/*/*.cc) \\
  \$(wildcard tensorflow/core/util/*.cc) \\
  \$(wildcard tensorflow/core/util/*/*.cc) \\
 -\$(wildcard tensorflow/contrib/makefile/downloads/double_conversion/double-conversion/*.cc) \\
- tensorflow/core/util/version_info.cc
- # Remove duplicates (for version_info.cc)
- CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
-@@ -716,10 +690,191 @@ endif  # TEGRA
+ tensorflow/core/profiler/internal/profiler_interface.cc \\
+ tensorflow/core/profiler/internal/traceme_recorder.cc \\
+ tensorflow/core/profiler/lib/profiler_session.cc \\
+@@ -727,10 +701,196 @@ endif  # TEGRA
  # Filter out all the excluded files.
  TF_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
  # Add in any extra files that don't fit the patterns easily
@@ -1105,7 +1172,9 @@ index 7ea6e34..c53bb55 100644
 +              tensorflow/core/kernels/cwise_op_sqrt.cc \\
 +              tensorflow/core/kernels/cwise_op_sub.cc \\
 +              tensorflow/core/kernels/control_flow_ops.cc \\
-+              tensorflow/core/kernels/conv_ops_fused.cc \\
++              tensorflow/core/kernels/conv_ops_fused_double.cc \\
++              tensorflow/core/kernels/conv_ops_fused_float.cc \\
++              tensorflow/core/kernels/conv_ops_fused_half.cc \\
 +              tensorflow/core/kernels/deep_conv2d.cc \\
 +              tensorflow/core/kernels/dense_update_ops.cc \\
 +              tensorflow/core/kernels/depthwise_conv_op.cc \\
@@ -1114,8 +1183,10 @@ index 7ea6e34..c53bb55 100644
 +              tensorflow/core/kernels/function_ops.cc \\
 +              tensorflow/core/kernels/functional_ops.cc \\
 +              tensorflow/core/kernels/fused_batch_norm_op.cc \\
++              tensorflow/core/kernels/fused_eigen_output_kernels.cc \\
 +              tensorflow/core/kernels/gather_op.cc \\
 +              tensorflow/core/kernels/identity_op.cc \\
++              tensorflow/core/kernels/inplace_ops.cc \\
 +              tensorflow/core/kernels/logging_ops.cc \\
 +              tensorflow/core/kernels/matmul_op.cc \\
 +              tensorflow/core/kernels/maxpooling_op.cc \\
@@ -1236,12 +1307,13 @@ index 7ea6e34..c53bb55 100644
 +                  tensorflow/core/kernels/mkl_pooling_ops_common.cc \\
 +                  tensorflow/core/kernels/mkl_reshape_op.cc \\
 +                  tensorflow/core/kernels/mkl_softmax_op.cc \\
-+                  tensorflow/core/kernels/mkl_transpose_op.cc
++                  tensorflow/core/kernels/mkl_transpose_op.cc \\
++                  tensorflow/core/ops/mkl_array_ops.cc
 +endif
  PBT_CC_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_pb_text_files.txt)
  PROTO_SRCS := \$(shell cat \$(MAKEFILE_DIR)/tf_proto_files.txt)
  BENCHMARK_SRCS := \\
-@@ -799,15 +954,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
+@@ -810,15 +970,23 @@ PROTO_CC_SRCS := \$(addprefix \$(PROTOGENDIR), \$(PROTO_SRCS:.proto=.pb.cc))
  PROTO_OBJS := \$(addprefix \$(OBJDIR), \$(PROTO_SRCS:.proto=.pb.o))
  LIB_OBJS := \$(PROTO_OBJS) \$(TF_CC_OBJS) \$(PBT_OBJS)
  BENCHMARK_OBJS := \$(addprefix \$(OBJDIR), \$(BENCHMARK_SRCS:.cc=.o))
@@ -1267,7 +1339,7 @@ index 7ea6e34..c53bb55 100644
  .phony_version_info:
  tensorflow/core/util/version_info.cc: .phony_version_info
  	tensorflow/tools/git/gen_git_source.sh \$@
-@@ -823,6 +986,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
+@@ -834,6 +1002,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
  	-o \$(BENCHMARK_NAME) \$(BENCHMARK_OBJS) \\
  	\$(LIBFLAGS) \$(TEGRA_LIBS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS) \$(CUDA_LIBS)
  
@@ -1284,11 +1356,75 @@ index 7ea6e34..c53bb55 100644
  # NVCC compilation rules for Tegra
  ifeq (\$(BUILD_FOR_TEGRA),1)
  \$(OBJDIR)%.cu.o: %.cu.cc
+diff --git a/tensorflow/core/graph/mkl_layout_pass.cc b/tensorflow/core/graph/mkl_layout_pass.cc
+index 6e7393e3..fe948d3d 100644
+--- a/tensorflow/core/graph/mkl_layout_pass.cc
++++ b/tensorflow/core/graph/mkl_layout_pass.cc
+@@ -347,10 +347,10 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     // End - element-wise ops. See note above.
+ 
+     // NOTE: names are alphabetically sorted.
+-    rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
+-                      CopyAttrsAddN, AlwaysRewrite});
+-    rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
+-                      CopyAttrsDataType, AlwaysRewrite});
++    //rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
++    //                  CopyAttrsAddN, AlwaysRewrite});
++    //rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
++    //                  CopyAttrsDataType, AlwaysRewrite});
+     rinfo_.push_back({csinfo_.avg_pool,
+                       mkl_op_registry::GetMklOpName(csinfo_.avg_pool),
+                       CopyAttrsPooling, AlwaysRewrite});
+@@ -366,9 +366,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     rinfo_.push_back({csinfo_.concat,
+                       mkl_op_registry::GetMklOpName(csinfo_.concat),
+                       CopyAttrsConcat, AlwaysRewrite});
+-    rinfo_.push_back({csinfo_.concatv2,
+-                      mkl_op_registry::GetMklOpName(csinfo_.concatv2),
+-                      CopyAttrsConcatV2, AlwaysRewrite});
++    //rinfo_.push_back({csinfo_.concatv2,
++    //                  mkl_op_registry::GetMklOpName(csinfo_.concatv2),
++    //                  CopyAttrsConcatV2, AlwaysRewrite});
+     rinfo_.push_back({csinfo_.conv2d,
+                       mkl_op_registry::GetMklOpName(csinfo_.conv2d),
+                       CopyAttrsConvCheckConstFilter, AlwaysRewrite});
+@@ -545,12 +545,12 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     rinfo_.push_back({csinfo_.relu_grad,
+                       mkl_op_registry::GetMklOpName(csinfo_.relu_grad),
+                       CopyAttrsDataType, AlwaysRewrite});
+-    rinfo_.push_back({csinfo_.relu6,
+-                      mkl_op_registry::GetMklOpName(csinfo_.relu6),
+-                      CopyAttrsDataType, AlwaysRewrite});
+-    rinfo_.push_back({csinfo_.relu6_grad,
+-                      mkl_op_registry::GetMklOpName(csinfo_.relu6_grad),
+-                      CopyAttrsDataType, AlwaysRewrite});
++    //rinfo_.push_back({csinfo_.relu6,
++    //                  mkl_op_registry::GetMklOpName(csinfo_.relu6),
++    //                  CopyAttrsDataType, AlwaysRewrite});
++    //rinfo_.push_back({csinfo_.relu6_grad,
++    //                  mkl_op_registry::GetMklOpName(csinfo_.relu6_grad),
++    //                  CopyAttrsDataType, AlwaysRewrite});
+     rinfo_.push_back({csinfo_.requantize,
+                       mkl_op_registry::GetMklOpName(csinfo_.requantize),
+                       CopyAttrsRequantize, AlwaysRewrite});
+@@ -562,9 +562,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+                       mkl_op_registry::GetMklOpName(csinfo_.tanh_grad),
+                       CopyAttrsDataType, AlwaysRewrite});
+     */
+-    rinfo_.push_back({csinfo_.reshape,
+-                      mkl_op_registry::GetMklOpName(csinfo_.reshape),
+-                      CopyAttrsReshape, AlwaysRewrite});
++    //rinfo_.push_back({csinfo_.reshape,
++    //                  mkl_op_registry::GetMklOpName(csinfo_.reshape),
++    //                  CopyAttrsReshape, AlwaysRewrite});
+     rinfo_.push_back({csinfo_.slice,
+                       mkl_op_registry::GetMklOpName(csinfo_.slice),
+                       CopyAttrsSlice, AlwaysRewrite});
 diff --git a/tensorflow/core/grappler/clusters/utils.cc b/tensorflow/core/grappler/clusters/utils.cc
-index 567e7c0..434d034 100644
+index f7af7cc3..ff95ac2f 100644
 --- a/tensorflow/core/grappler/clusters/utils.cc
 +++ b/tensorflow/core/grappler/clusters/utils.cc
-@@ -120,19 +120,6 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
+@@ -154,19 +154,6 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
  
    if (device.type == "CPU") {
      return GetLocalCPUInfo();
@@ -1309,7 +1445,7 @@ index 567e7c0..434d034 100644
    return unknown;
  }
 diff --git a/tensorflow/core/grappler/costs/utils.cc b/tensorflow/core/grappler/costs/utils.cc
-index d45bb14..e59c8c0 100644
+index d45bb14e..e59c8c01 100644
 --- a/tensorflow/core/grappler/costs/utils.cc
 +++ b/tensorflow/core/grappler/costs/utils.cc
 @@ -239,16 +239,7 @@ DeviceProperties GetDeviceInfo(const string& device_str) {
@@ -1331,7 +1467,7 @@ index d45bb14..e59c8c0 100644
      }
    }
 diff --git a/tensorflow/core/kernels/cwise_op_sigmoid.cc b/tensorflow/core/kernels/cwise_op_sigmoid.cc
-index c132fdb..c07ef05 100644
+index c132fdb6..c07ef055 100644
 --- a/tensorflow/core/kernels/cwise_op_sigmoid.cc
 +++ b/tensorflow/core/kernels/cwise_op_sigmoid.cc
 @@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
@@ -1395,7 +1531,7 @@ index c132fdb..c07ef05 100644
 +
  }  // namespace tensorflow
 diff --git a/tensorflow/core/kernels/neon/depthwiseconv_float.h b/tensorflow/core/kernels/neon/depthwiseconv_float.h
-index 0d5a42b..0b5f00a 100644
+index 0d5a42bf..0b5f00a6 100644
 --- a/tensorflow/core/kernels/neon/depthwiseconv_float.h
 +++ b/tensorflow/core/kernels/neon/depthwiseconv_float.h
 @@ -23,6 +23,23 @@ limitations under the License.
@@ -1423,7 +1559,7 @@ index 0d5a42b..0b5f00a 100644
  namespace neon {
  
 diff --git a/tensorflow/core/kernels/softmax_op.cc b/tensorflow/core/kernels/softmax_op.cc
-index 93a7537..6bdc871 100644
+index 93a75378..6bdc8716 100644
 --- a/tensorflow/core/kernels/softmax_op.cc
 +++ b/tensorflow/core/kernels/softmax_op.cc
 @@ -15,6 +15,8 @@ limitations under the License.
@@ -1529,10 +1665,10 @@ index 93a7537..6bdc871 100644
 +
  }  // namespace tensorflow
 diff --git a/tensorflow/core/ops/math_ops.cc b/tensorflow/core/ops/math_ops.cc
-index 6f261dc..1e31ee8 100644
+index 3ff9bc09..e6b889c0 100644
 --- a/tensorflow/core/ops/math_ops.cc
 +++ b/tensorflow/core/ops/math_ops.cc
-@@ -262,6 +262,28 @@ expected to create these operators.
+@@ -327,6 +327,28 @@ expected to create these operators.
  #undef UNARY_REAL
  #undef UNARY_COMPLEX
  
@@ -1562,10 +1698,10 @@ index 6f261dc..1e31ee8 100644
      .Input("x: T")
      .Output("y: bool")
 diff --git a/tensorflow/core/ops/nn_ops.cc b/tensorflow/core/ops/nn_ops.cc
-index ee528c7..0ed9f39 100644
+index fe69a7a2..a9fb3d16 100644
 --- a/tensorflow/core/ops/nn_ops.cc
 +++ b/tensorflow/core/ops/nn_ops.cc
-@@ -1093,6 +1093,50 @@ REGISTER_OP("LogSoftmax")
+@@ -1139,6 +1139,50 @@ REGISTER_OP("LogSoftmax")
  
  // --------------------------------------------------------------------------
  
@@ -1616,181 +1752,12 @@ index ee528c7..0ed9f39 100644
  REGISTER_OP("SoftmaxCrossEntropyWithLogits")
      .Input("features: T")
      .Input("labels: T")
-diff --git a/tensorflow/core/util/mkl_util.h b/tensorflow/core/util/mkl_util.h
-index 125a2e6b23..e38153bed6 100644
---- a/tensorflow/core/util/mkl_util.h
-+++ b/tensorflow/core/util/mkl_util.h
-@@ -17,6 +17,7 @@ limitations under the License.
- #define TENSORFLOW_CORE_UTIL_MKL_UTIL_H_
- #ifdef INTEL_MKL
- 
-+#include <list>
- #include <memory>
- #include <string>
- #include <unordered_map>
-@@ -1766,6 +1767,7 @@ class MklDnnData {
-   inline void SetUsrMem(const memory::primitive_desc& pd,
-                         void* data_buffer = nullptr) {
-     CHECK_NOTNULL(cpu_engine_);
-+    if (user_memory_) delete user_memory_;
-     // TODO(nhasabni): can we remove dynamic memory allocation?
-     if (data_buffer) {
-       user_memory_ = new memory(pd, data_buffer);
-@@ -2060,6 +2062,106 @@ class MklPrimitive {
- 
- const mkldnn::memory::dims NONE_DIMS = {};
- 
-+// LRUCache is a class which implements LRU (Least Recently Use) cache.
-+// The implementation is similar to that of
-+//    tensorflow/core/platform/cloud/expiring_lru_cache.h
-+// without its thread-safe part because the cache is supposed to be
-+// used as thread local (for instance, MKLPrimitive caching).
-+//
-+// The LRU list maintains objects in chronological order based on
-+// creation time, with the least recently accessed object at the
-+// tail of LRU list, while the most recently accessed object
-+// at the head of LRU list.
-+//
-+// This class is used to maintain an upper bound on the total number of
-+// cached items. When the cache reaches its capacity, the LRU item will
-+// be removed and replaced by a new one from SetOp call.
-+//
-+template <typename T>
-+class LRUCache {
-+ public:
-+  explicit LRUCache(size_t capacity) {
-+    capacity_ = capacity;
-+    Clear();
-+  }
-+
-+  T* GetOp(const string& key) {
-+    auto it = cache_.find(key);
-+    if (it == cache_.end()) {
-+      return nullptr;
-+    }
-+
-+    // Move to the front of LRU list as the most recently accessed.
-+    lru_list_.erase(it->second.lru_iterator);
-+    lru_list_.push_front(it->first);
-+    it->second.lru_iterator = lru_list_.begin();
-+    return it->second.op;
-+  }
-+
-+  void SetOp(const string& key, T* op) {
-+    if (lru_list_.size() >= capacity_) {
-+      Delete();
-+    }
-+
-+    // Insert an entry to the front of the LRU list
-+    lru_list_.push_front(key);
-+    Entry entry(op, lru_list_.begin());
-+    cache_.insert(std::make_pair(key, entry));
-+  }
-+
-+  void Clear() {
-+    if (lru_list_.empty()) return;
-+
-+    // delete the cached objects
-+    for (auto& key : lru_list_) {
-+      auto it = cache_.find(key);
-+      DCHECK(it == cache_.end());
-+      delete it->second.op;
-+    }
-+
-+    // clean up the cache
-+    cache_.clear();
-+    lru_list_.clear();
-+  }
-+
-+ private:
-+  struct Entry {
-+    // The entry's value.
-+    T* op;
-+
-+    // A list iterator pointing to the entry's position in the LRU list.
-+    std::list<string>::iterator lru_iterator;
-+    Entry(T* op, std::list<string>::iterator it) {
-+      this->op = op;
-+      this->lru_iterator = it;
-+    }
-+  };
-+
-+  // Remove the least recently accessed entry from LRU list, which
-+  // is the tail of lru_list_. Correspondingly cache_ is updated.
-+  bool Delete() {
-+    if (lru_list_.empty()) return false;
-+    string key = lru_list_.back();
-+    auto it = cache_.find(key);
-+    DCHECK(it == cache_.end());
-+    lru_list_.pop_back();
-+    delete it->second.op;  // delete the object
-+    cache_.erase(it);
-+    return true;
-+  }
-+
-+  // cache capacity
-+  size_t capacity_;
-+
-+  // The cache, a map from string key to a LRU entry.
-+  std::unordered_map<string, Entry> cache_;
-+
-+  // The LRU list of entries.
-+  // The front of the list identifies the most recently accessed entry,
-+  // while the back of the list is the least recently accessed entry.
-+  std::list<string> lru_list_;
-+};
-+
- template <typename T>
- class MklPrimitiveFactory {
-  public:
-@@ -2068,23 +2170,13 @@ class MklPrimitiveFactory {
-   ~MklPrimitiveFactory() {}
- 
-   MklPrimitive* GetOp(const string& key) {
--    auto& map = MklPrimitiveFactory<T>::GetHashMap();
--    auto stream_iter = map.find(key);
--    if (stream_iter == map.end()) {
--      return nullptr;
--    } else {
--      CHECK(stream_iter->second != nullptr) << "nullptr present in map";
--      return stream_iter->second;
--    }
-+    auto& lru_cache = MklPrimitiveFactory<T>::GetLRUCache();
-+    return lru_cache.GetOp(key);
-   }
- 
-   void SetOp(const string& key, MklPrimitive* op) {
--    auto& map = MklPrimitiveFactory<T>::GetHashMap();
--    auto stream_iter = map.find(key);
--
--    CHECK(stream_iter == map.end());
--
--    map[key] = op;
-+    auto& lru_cache = MklPrimitiveFactory<T>::GetLRUCache();
-+    lru_cache.SetOp(key, op);
-   }
- 
-   /// Function to decide whether HW has AVX512 or AVX2
-@@ -2104,9 +2196,10 @@ class MklPrimitiveFactory {
-   }
- 
-  private:
--  static inline std::unordered_map<string, MklPrimitive*>& GetHashMap() {
--    static thread_local std::unordered_map<string, MklPrimitive*> map_;
--    return map_;
-+   static inline LRUCache<MklPrimitive>& GetLRUCache() {
-+    static const int kCapacity = 1024;  // cache capacity
-+    static thread_local LRUCache<MklPrimitive> lru_cache_(kCapacity);
-+    return lru_cache_;
-   }
- };
- 
 diff --git a/tensorflow/lite/Makefile b/tensorflow/lite/Makefile
 new file mode 100644
-index 0000000..8cde710
+index 00000000..947fbe17
 --- /dev/null
 +++ b/tensorflow/lite/Makefile
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,80 @@
 +SHELL := /bin/bash
 +
 +MAKEFILE_DIR := \$(shell dirname \$(realpath \$(lastword \$(MAKEFILE_LIST))))
@@ -1802,10 +1769,10 @@ index 0000000..8cde710
 +
 +CC := gcc
 +CXX := g++
-+CCFLAGS := -O3 -DNDEBUG ${mopts} -DGEMMLOWP_ALLOW_SLOW_SCALAR_FALLBACK -pthread
++CCFLAGS := -O3 -DNDEBUG $mopts -DGEMMLOWP_ALLOW_SLOW_SCALAR_FALLBACK -pthread
 +CXXFLAGS := \$(CCFLAGS) --std=c++11 -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
-+INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I${prefix}/include -I${prefix}/include/eigen3 -I${prefix}/include/gemmlowp
-+LIBS := -lfarmhash -lstdc++ -lpthread -lm -lz -ldl
++INCLUDES := -I. -I\$(MAKEFILE_DIR)/../../../ -I$prefix/include -I$prefix/include/eigen3 -I$prefix/include/gemmlowp
++LIBS := -lfarmhash -lflatbuffers -lstdc++ -lpthread -lm -lz -ldl
 +
 +AR := ar
 +ARFLAGS := -r
@@ -1824,6 +1791,7 @@ index 0000000..8cde710
 +                    \$(wildcard tensorflow/lite/c/*.c) \\
 +                    \$(wildcard tensorflow/lite/core/*.cc) \\
 +                    \$(wildcard tensorflow/lite/core/api/*.cc) \\
++                    \$(wildcard tensorflow/lite/experimental/ruy/*.cc) \\
 +                    \$(wildcard tensorflow/lite/kernels/*.cc) \\
 +                    \$(wildcard tensorflow/lite/kernels/*.c) \\
 +                    \$(wildcard tensorflow/lite/kernels/internal/*.cc) \\
@@ -1832,14 +1800,20 @@ index 0000000..8cde710
 +                    \$(wildcard tensorflow/lite/kernels/internal/optimized/*.c) \\
 +                    \$(wildcard tensorflow/lite/kernels/internal/reference/*.cc) \\
 +                    \$(wildcard tensorflow/lite/kernels/internal/reference/*.c) \\
++                    tensorflow/lite/delegates/nnapi/nnapi_delegate_disabled.cc \\
 +                    tensorflow/lite/profiling/time.cc
 +CORE_CC_ALL_SRCS := \$(sort \$(CORE_CC_ALL_SRCS))
 +CORE_CC_EXCLUDE_SRCS := \$(wildcard tensorflow/lite/*test.cc) \\
 +                        \$(wildcard tensorflow/lite/*/*test.cc) \\
 +                        \$(wildcard tensorflow/lite/*/*/*test.cc) \\
 +                        \$(wildcard tensorflow/lite/*/*/*/*test.cc) \\
++                        \$(wildcard tensorflow/lite/experimental/ruy/test_*.cc) \\
++                        tensorflow/lite/experimental/ruy/benchmark.cc \\
 +                        tensorflow/lite/kernels/internal/spectrogram.cc \\
-+                        tensorflow/lite/kernels/test_util.cc
++                        tensorflow/lite/kernels/subgraph_test_util.cc \\
++                        tensorflow/lite/kernels/test_main.cc \\
++                        tensorflow/lite/kernels/test_util.cc \\
++                        tensorflow/lite/minimal_logging_android.cc
 +TF_LITE_CC_SRCS := \$(filter-out \$(CORE_CC_EXCLUDE_SRCS), \$(CORE_CC_ALL_SRCS))
 +TF_LITE_CC_OBJS := \$(addprefix \$(OBJDIR), \$(patsubst %.cc,%.o,\$(patsubst %.c,%.o,\$(TF_LITE_CC_SRCS))))
 +LIB_OBJS := \$(TF_LITE_CC_OBJS)
@@ -1865,7 +1839,7 @@ index 0000000..8cde710
 +clean:
 +	rm -rf \$(MAKEFILE_DIR)/gen
 diff --git a/tensorflow/lite/interpreter.cc b/tensorflow/lite/interpreter.cc
-index e2129ed..7523011 100644
+index 9edef375..025709c5 100644
 --- a/tensorflow/lite/interpreter.cc
 +++ b/tensorflow/lite/interpreter.cc
 @@ -20,6 +20,8 @@ limitations under the License.
@@ -1878,23 +1852,23 @@ index e2129ed..7523011 100644
  #include "tensorflow/lite/context_util.h"
  #include "tensorflow/lite/core/api/error_reporter.h"
 diff --git a/tensorflow/lite/kernels/register.cc b/tensorflow/lite/kernels/register.cc
-index c0e6f69..ee8ed3b 100644
+index 8543600e..4dc84321 100644
 --- a/tensorflow/lite/kernels/register.cc
 +++ b/tensorflow/lite/kernels/register.cc
-@@ -274,8 +274,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
+@@ -397,8 +397,6 @@ BuiltinOpResolver::BuiltinOpResolver() {
    // TODO(andrewharp, ahentz): Move these somewhere more appropriate so that
    // custom ops aren't always included by default.
    AddCustom("Mfcc", tflite::ops::custom::Register_MFCC());
 -  AddCustom("AudioSpectrogram",
 -            tflite::ops::custom::Register_AUDIO_SPECTROGRAM());
-   AddCustom("LayerNormLstm", tflite::ops::custom::Register_LAYER_NORM_LSTM());
-   AddCustom("Relu1", tflite::ops::custom::Register_RELU_1());
    AddCustom("TFLite_Detection_PostProcess",
+             tflite::ops::custom::Register_DETECTION_POSTPROCESS());
+ 
 diff --git a/tensorflow/lite/nnapi/NeuralNetworksShim.h b/tensorflow/lite/nnapi/NeuralNetworksShim.h
-index c39502f..7f93e98 100644
+index c48528fa..625cc86d 100644
 --- a/tensorflow/lite/nnapi/NeuralNetworksShim.h
 +++ b/tensorflow/lite/nnapi/NeuralNetworksShim.h
-@@ -74,8 +74,12 @@ inline void* loadFunction(const char* name) {
+@@ -80,8 +80,12 @@ inline void* loadFunction(const char* name) {
  }
  
  inline bool NNAPIExists() {
@@ -1907,64 +1881,6 @@ index c39502f..7f93e98 100644
  }
  
  // NN api types based on NNAPI header file
-diff --git a/tensorflow/core/graph/mkl_layout_pass.cc b/tensorflow/core/graph/mkl_layout_pass.cc
-index 9495132f4a..32bcdb2e7e 100644
---- a/tensorflow/core/graph/mkl_layout_pass.cc
-+++ b/tensorflow/core/graph/mkl_layout_pass.cc
-@@ -335,8 +335,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     // NOTE: names are alphabetically sorted.
-     rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
-                       CopyAttrsAddN, AddNRewrite});
--    rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
--                      CopyAttrsDataType, AlwaysRewrite});
-+    /*rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
-+                      CopyAttrsDataType, AlwaysRewrite});*/
-     rinfo_.push_back({csinfo_.avg_pool,
-                       mkl_op_registry::GetMklOpName(csinfo_.avg_pool),
-                       CopyAttrsPooling, AlwaysRewrite});
-@@ -352,9 +352,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     rinfo_.push_back({csinfo_.concat,
-                       mkl_op_registry::GetMklOpName(csinfo_.concat),
-                       CopyAttrsConcat, AlwaysRewrite});
--    rinfo_.push_back({csinfo_.concatv2,
-+    /*rinfo_.push_back({csinfo_.concatv2,
-                       mkl_op_registry::GetMklOpName(csinfo_.concatv2),
--                      CopyAttrsConcatV2, AlwaysRewrite});
-+                      CopyAttrsConcatV2, AlwaysRewrite});*/
-     rinfo_.push_back({csinfo_.conv2d,
-                       mkl_op_registry::GetMklOpName(csinfo_.conv2d),
-                       CopyAttrsConv, AlwaysRewrite});
-@@ -419,8 +419,8 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-     rinfo_.push_back({csinfo_.maximum,
-                       mkl_op_registry::GetMklOpName(csinfo_.maximum),
-                       CopyAttrsDataType, AlwaysRewrite});
--    rinfo_.push_back({csinfo_.mul, mkl_op_registry::GetMklOpName(csinfo_.mul),
--                      CopyAttrsDataType, AlwaysRewrite});
-+    /*rinfo_.push_back({csinfo_.mul, mkl_op_registry::GetMklOpName(csinfo_.mul),
-+                      CopyAttrsDataType, AlwaysRewrite});*/
-     rinfo_.push_back({csinfo_.pad_with_conv2d, csinfo_.mkl_pad_with_conv2d,
-                       CopyAttrsPadWithConv2D, AlwaysRewrite});
- #ifdef INTEL_MKL_QUANTIZED
-@@ -496,17 +496,15 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
-                       mkl_op_registry::GetMklOpName(csinfo_.requantize),
-                       CopyAttrsRequantize, AlwaysRewrite});
- #endif
--    /*
--    rinfo_.push_back({csinfo_.tanh,
-+    /*rinfo_.push_back({csinfo_.tanh,
-                       mkl_op_registry::GetMklOpName(csinfo_.tanh),
-                       CopyAttrsDataType, AlwaysRewrite});
-     rinfo_.push_back({csinfo_.tanh_grad,
-                       mkl_op_registry::GetMklOpName(csinfo_.tanh_grad),
-                       CopyAttrsDataType, AlwaysRewrite});
--    */
-     rinfo_.push_back({csinfo_.reshape,
-                       mkl_op_registry::GetMklOpName(csinfo_.reshape),
--                      CopyAttrsReshape, AlwaysRewrite});
-+                      CopyAttrsReshape, AlwaysRewrite});*/
-     rinfo_.push_back({csinfo_.slice,
-                       mkl_op_registry::GetMklOpName(csinfo_.slice),
-                       CopyAttrsSlice, AlwaysRewrite});
 EOD
         rc=$?
         if [ $rc != 0 ]; then
@@ -2249,7 +2165,7 @@ install_opencv() {
           -DBUILD_opencv_ximgproc=OFF \
           -DBUILD_opencv_xobjdetect=OFF \
           -DBUILD_opencv_xphoto=OFF \
-          -DCMAKE_INSTALL_PREFIX=${prefix} \
+          -DCMAKE_INSTALL_PREFIX=$prefix \
           -DCMAKE_C_COMPILER=/usr/bin/gcc \
           -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
           -DOPENCV_EXTRA_MODULES_PATH=../contrib/modules \
@@ -2300,8 +2216,7 @@ install_dldt() {
             return 1
         fi
         cd dldt/inference-engine
-        git submodule init &&
-            git submodule update --recursive
+        git submodule init && git submodule update --recursive
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download sub modules for DLDT inference engine!${NC}"
@@ -2361,6 +2276,49 @@ index 19e7573..d824651 100644
      export(TARGETS \${TARGET_NAME} NAMESPACE IE:: APPEND FILE "\${CMAKE_BINARY_DIR}/targets.cmake")
 +    export(TARGETS \${TARGET_NAME}_s NAMESPACE IE:: APPEND FILE "\${CMAKE_BINARY_DIR}/targets.cmake")
  endif()
+diff --git a/thirdparty/mkl-dnn/cmake/SDL.cmake b/thirdparty/mkl-dnn/cmake/SDL.cmake
+index c4e0ab4..dd8217e 100644
+--- a/thirdparty/mkl-dnn/cmake/SDL.cmake
++++ b/thirdparty/mkl-dnn/cmake/SDL.cmake
+@@ -24,7 +24,7 @@ set(SDL_cmake_included true)
+ include("cmake/utils.cmake")
+ 
+ if(UNIX)
+-    set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")
++    set(CMAKE_CCXX_FLAGS "-Wformat -Wformat-security")
+     append(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
+     append(CMAKE_C_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
+     if("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+@@ -53,7 +53,6 @@ if(UNIX)
+         append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-bind_at_load")
+         append(CMAKE_EXE_LINKER_FLAGS "-Wl,-bind_at_load")
+     else()
+-        append(CMAKE_EXE_LINKER_FLAGS "-pie")
+         append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
+         append(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
+     endif()
+diff --git a/thirdparty/mkl-dnn/cmake/platform.cmake b/thirdparty/mkl-dnn/cmake/platform.cmake
+index a541215..ae790d2 100644
+--- a/thirdparty/mkl-dnn/cmake/platform.cmake
++++ b/thirdparty/mkl-dnn/cmake/platform.cmake
+@@ -24,8 +24,6 @@ set(platform_cmake_included true)
+ 
+ include("cmake/utils.cmake")
+ 
+-add_definitions(-DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS)
+-
+ # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
+ # C++ standard (see C99 standard 7.18.2 and 7.18.4)
+ add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
+@@ -113,7 +111,7 @@ elseif(UNIX OR MINGW)
+         endif()
+     elseif("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+         if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
+-            set(DEF_ARCH_OPT_FLAGS "-march=native -mtune=native")
++            set(DEF_ARCH_OPT_FLAGS "$mopts")
+         endif()
+         # suppress warning on assumptions made regarding overflow (#146)
+         append(CMAKE_CCXX_NOWARN_FLAGS "-Wno-strict-overflow")
 EOD
         rc=$?
         if [ $rc != 0 ]; then
@@ -2373,8 +2331,9 @@ EOD
     mkdir -p build
     cd build
     cmake -DCMAKE_INSTALL_PREFIX=$prefix -DCMAKE_BUILD_TYPE=Release -DTHREADING=SEQ \
-          -DENABLE_OPENCV=OFF -DENABLE_SAMPLES=OFF -DENABLE_SAMPLES_CORE=OFF \
-          -DENABLE_SEGMENTATION_TESTS=OFF -DENABLE_OBJECT_DETECTION_TESTS=OFF .. &&
+          -DENABLE_PROFILING_ITT=OFF -DENABLE_OPENCV=OFF -DENABLE_SAMPLES=OFF \
+          -DENABLE_SAMPLES_CORE=OFF -DENABLE_SEGMENTATION_TESTS=OFF \
+          -DENABLE_OBJECT_DETECTION_TESTS=OFF .. &&
     make -j $(nproc) all ie_cpu_extension_s
     rc=$?
     if [ $rc != 0 ]; then
@@ -2390,10 +2349,10 @@ EOD
             bin/intel64/Release/lib/libfluid.a \
             bin/intel64/Release/lib/libcpu_extension.so \
             bin/intel64/Release/lib/libie_cpu_extension_s.a \
-            bin/intel64/Release/lib/libmkldnn.a \
             bin/intel64/Release/lib/libclDNN64.so \
             build/lib/libade.a $prefix/lib &&
     sudo cp bin/intel64/Release/lib/libtest_MKLDNNPlugin.a $prefix/lib/libMKLDNNPlugin_s.a &&
+    sudo cp bin/intel64/Release/lib/libmkldnn.a $prefix/lib/libdldt_ie_mkldnn.a &&
     sudo cp bin/intel64/Release/lib/libclDNNPlugin.so \
             bin/intel64/Release/lib/libGNAPlugin.so \
             bin/intel64/Release/lib/libHeteroPlugin.so \
@@ -2403,15 +2362,7 @@ EOD
         echo -e "${RED}Failed to install inference engine!${NC}"
         return 1
     fi
-    cd ..
-    sudo -H pip3 install -r model-optimizer/requirements.txt &&
-    sudo cp -r model-optimizer $prefix
-    rc=$?
-    if [ $rc != 0 ]; then
-        echo -e "${RED}Failed to install model optimizer!${NC}"
-        return 1
-    fi
-    cd ..
+    cd ../..
 }
 
 install_gperftools &&

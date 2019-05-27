@@ -200,7 +200,7 @@ OPENCV_LDFLAGS=-lopencv_imgcodecs -lopencv_imgproc -lopencv_core \
 
 $(BIN)/obj_detect_lite: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_lite.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -ltensorflow-lite -lfarmhash $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	g++ -o $@ $^ -ltensorflow-lite -lfarmhash -lflatbuffers $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/obj_detect.o: obj_detect.cc test_video.hpp video_encoder.hpp utils.hpp
 	mkdir -p $(BIN)
@@ -220,7 +220,7 @@ $(BIN)/obj_detect_dldt: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_de
 	mkdir -p $(BIN)
 	g++ -o $@ $^ -linference_engine_s -lMKLDNNPlugin_s -linference_engine_s -lfluid -lade \
 	             -lpugixml -Wl,--whole-archive -lie_cpu_extension_s -Wl,--no-whole-archive \
-	             -lmkldnn $(OPENCV_LDFLAGS) $(LDFLAGS)
+	             -ldldt_ie_mkldnn $(OPENCV_LDFLAGS) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)

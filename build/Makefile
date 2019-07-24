@@ -1,6 +1,6 @@
 WORK_DIR:=$(shell readlink -f $(dir $(lastword $(MAKEFILE_LIST))))
 
-VERSION?=1.14.0-rc0
+VERSION?=1.14.0
 BLAS?=MKL
 MKLDNN_VERSION?=0.19
 

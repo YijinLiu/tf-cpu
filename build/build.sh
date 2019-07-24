@@ -16,8 +16,8 @@ usage() {
 }
 
 blas=MKL
-version=1.14.0-rc0
-bazel_version=0.25.3
+version=1.14.0
+bazel_version=0.28.1
 prefix=/usr/local
 # Use "gcc -march=native -Q --help=target" to see which options are enabled.
 mopts="-march=native"
@@ -1909,7 +1909,7 @@ EOD
     fi
 
     # Build tensorflow core.
-    bazel build //tensorflow/cc:cc_ops
+    bazel build --incompatible_py3_is_default //tensorflow/cc:cc_ops
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to generate Tensorflow cc ops files!${NC}"

@@ -5,7 +5,7 @@ RUN apt update && apt upgrade -y && \
     apt install -qq -y --no-install-recommends \
         autoconf automake bash bash-completion build-essential ca-certificates cmake cpio curl \
         dpkg git libgfortran-5-dev libjpeg-dev libtool openjdk-8-jdk pkg-config \
-        python3 python3-pip ssh sudo tzdata unzip wget yasm zlib1g-dev && \
+        python python-future python3 python3-pip ssh sudo tzdata unzip wget yasm zlib1g-dev && \
     echo America/Los_Angeles > /etc/timezone && \
     dpkg-reconfigure --frontend noninteractive tzdata
 

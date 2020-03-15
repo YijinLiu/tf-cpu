@@ -1,7 +1,4 @@
 // Run object detection model using DLDT.
-// NOTE: Though Intel claims it supports any input size using reshape, it actually won't work:
-// - The accuracy is bad, may completely miss detection when the input size is not 300x300
-// - Very slow when the input size is big.
 
 #include <time.h>
 

@@ -3,9 +3,13 @@ FROM ubuntu:18.04
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt update && apt upgrade -y && \
     apt install -qq -y --no-install-recommends \
-        autoconf automake bash bash-completion build-essential ca-certificates cmake cpio curl \
-        dpkg git libgfortran-5-dev libjpeg-dev libtool openjdk-8-jdk pkg-config \
-        python python-future python3 python3-pip ssh sudo tzdata unzip wget yasm zlib1g-dev && \
+        autoconf automake bash bash-completion build-essential ca-certificates clinfo cmake cpio \
+        curl dpkg git libgfortran-5-dev libjpeg-dev libtool libusb-1.0-0-dev openjdk-8-jdk \
+        pkg-config python python-future python3 python3-pip software-properties-common ssh sudo \
+        tzdata unzip wget yasm zlib1g-dev && \
+    add-apt-repository -y ppa:intel-opencl/intel-opencl && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends intel-opencl-icd && \
     echo America/Los_Angeles > /etc/timezone && \
     dpkg-reconfigure --frontend noninteractive tzdata
 
@@ -16,7 +20,8 @@ ARG GID
 RUN groupadd -g $GID $NAME && \
     useradd -u $UID -g $NAME --groups sudo --shell /bin/bash $NAME && \
     echo "$NAME ALL = NOPASSWD: ALL" > /etc/sudoers.d/$NAME && \
-    chown -R $NAME:$NAME /home/$NAME
+    chown -R $NAME:$NAME /home/$NAME && \
+    usermod -G video $NAME
 USER $NAME
 WORKDIR /home/$NAME
 

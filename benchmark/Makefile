@@ -76,18 +76,22 @@ run_classify: $(BIN)/classify \
 run_obj_detect_dldt: run_obj_detect_dldt_model_ssdlite_mobilenet_v2_coco_2018_05_09 \
                      run_obj_detect_dldt_model_ssdlite_mobilenet_v2_mixed
 
+RUN_COUNT?=1
+DLDT_DEVICE?=CPU
+
 run_obj_detect_dldt_model_%: $(TESTDATA)/%_frozen.xml $(TESTDATA)/%_frozen.bin $(BIN)/obj_detect_dldt
 	@echo -e "\e[0;92mRunning $*_dldt ...\e[0m"
 	@mkdir -p $*_dldt
 	$(BIN)/obj_detect_dldt \
-	    --model $(TESTDATA)/$*_frozen --device=CPU \
+	    --model $(TESTDATA)/$*_frozen --device=$(DLDT_DEVICE) \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
 	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg \
-	    --output_dir=$*_dldt --logtostderr -v=$(VLOG_LEVEL)
+	    --output_dir=$*_dldt --logtostderr --run_count=$(RUN_COUNT) -v=$(VLOG_LEVEL)
 	$(BIN)/obj_detect_dldt \
-	    --model $(TESTDATA)/$*_frozen --device=CPU \
+	    --model $(TESTDATA)/$*_frozen --device=$(DLDT_DEVICE) \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
-	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_dldt --logtostderr -v=$(VLOG_LEVEL)
+	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_dldt --logtostderr \
+	    --run_count=$(RUN_COUNT) -v=$(VLOG_LEVEL)
 
 run_obj_detect_lite: run_obj_detect_lite_model_ssdlite_mobilenet_v2_coco10 \
                      run_obj_detect_lite_model_ssdlite_mobilenet_v2_mixed
@@ -97,7 +101,7 @@ run_obj_detect_lite_model_%: $(TESTDATA)/%.tflite $(BIN)/obj_detect_lite
 	@mkdir -p $*_lite
 	$(BIN)/obj_detect_lite \
 	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg \
-		--output_dir=$*_lite --model_file=$< -v=$(VLOG_LEVEL) \
+	    --output_dir=$*_lite --model_file=$< -v=$(VLOG_LEVEL) \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 	$(BIN)/obj_detect_lite \
 	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_lite --model_file=$< -v=$(VLOG_LEVEL) \

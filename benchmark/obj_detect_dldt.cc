@@ -26,7 +26,7 @@ using namespace InferenceEngine;
 
 DEFINE_string(model, "testdata/ssdlite_mobilenet_v2_coco_2018_05_09_frozen", "");
 DEFINE_string(labels_file, "", "");
-DEFINE_string(plugin_dir, "", "");
+DEFINE_string(plugin_dir, "/usr/local/lib", "");
 DEFINE_string(device, "CPU", "CPU/GPU");
 DEFINE_bool(collect_perf_count, false, "");
 
@@ -38,6 +38,7 @@ DEFINE_string(output_dir, ".", "");
 DEFINE_bool(output_video, true, "");
 DEFINE_int32(batch_size, 1, "");
 DEFINE_int32(ffmpeg_log_level, 8, "");
+DEFINE_int32(run_count, 1, "");
 
 namespace {
 
@@ -116,14 +117,6 @@ struct AVFrameWrapper {
     AVFrame* frame;
 };
 
-InferencePlugin StaticLinkedCpuPlugin() {
-    IInferencePlugin* impl = nullptr;
-    ResponseDesc desc;
-    const StatusCode code = CreatePluginEngine(impl, &desc);
-    if (code != StatusCode::OK) THROW_IE_EXCEPTION << desc.msg;
-    return InferencePlugin(InferenceEnginePluginPtr(impl));
-}
-
 class ObjDetector {
   public:
     ObjDetector(const std::vector<std::string>& labels) : labels_(labels) {};
@@ -132,24 +125,25 @@ class ObjDetector {
         VLOG(1) << "InferenceEngine: " << VersionString(GetInferenceEngineVersion());
         err_listener_.set_prefix(Sprintf("[IE %s] ", device.c_str()));
         try {
-            if (plugin_dir.empty() && device == "CPU") {
-                VLOG(1) << "Use static linked CPU plugin.";
-                plugin_ = StaticLinkedCpuPlugin();
-            } else {
-                plugin_ = PluginDispatcher({plugin_dir}).getPluginByDevice(device);
+            std::map<std::string, std::string> cfgs;
+            if (FLAGS_collect_perf_count) {
+                cfgs[PluginConfigParams::KEY_PERF_COUNT] = PluginConfigParams::YES;
             }
+            if (device == "CPU") {
+                plugin_ = PluginDispatcher({plugin_dir}).getPluginByName("MKLDNNPlugin");
+                cfgs[PluginConfigParams::KEY_CPU_BIND_THREAD] = PluginConfigParams::YES;
+                cfgs[PluginConfigParams::KEY_CPU_THROUGHPUT_STREAMS] = "1";
+            } else {
+                plugin_ = PluginDispatcher({plugin_dir}).getPluginByName("clDNNPlugin");
+                cfgs[PluginConfigParams::KEY_CONFIG_FILE] =
+                    plugin_dir + "/cldnn_global_custom_kernels/cldnn_global_custom_kernels.xml";
+            }
+            plugin_.SetConfig(cfgs);
             static_cast<InferenceEnginePluginPtr>(plugin_)->SetLogCallback(err_listener_);
             if (device == "CPU") {
                 VLOG(1) << "Adding CPU extension...";
                 plugin_.AddExtension(std::make_shared<Extensions::Cpu::CpuExtensions>());
             }
-            std::map<std::string, std::string> cfgs;
-            cfgs[PluginConfigParams::KEY_CPU_BIND_THREAD] = PluginConfigParams::YES;
-            cfgs[PluginConfigParams::KEY_CPU_THROUGHPUT_STREAMS] = "1";
-            if (FLAGS_collect_perf_count) {
-                cfgs[PluginConfigParams::KEY_PERF_COUNT] = PluginConfigParams::YES;
-            }
-            plugin_.SetConfig(cfgs);
             VLOG(1) << "InferenceEngine/" << device << ": " << VersionString(plugin_.GetVersion());
 
             CNNNetReader networkReader;
@@ -465,14 +459,16 @@ int main(int argc, char *argv[]) {
     if (!ReadLines(FLAGS_labels_file, &labels)) return 1;
     ObjDetector obj_detector(labels);
     if (!obj_detector.Init(FLAGS_model, FLAGS_plugin_dir, FLAGS_device)) return 1;
-    if (!FLAGS_video_file.empty()) {
-        obj_detector.RunVideo(FLAGS_video_file, FLAGS_batch_size, FLAGS_height, FLAGS_width,
-                              FLAGS_output_dir + "/" + filename_base(FLAGS_video_file),
-                              FLAGS_output_video);
-    } else if (!FLAGS_image_files.empty()) {
-        for (const std::string& img_file : split(FLAGS_image_files, ',')) {
-            obj_detector.RunImage(img_file, FLAGS_height, FLAGS_width,
-                                  FLAGS_output_dir + "/" + filename_base(img_file));
+    for (int i = 0; i < FLAGS_run_count; i++) {
+        if (!FLAGS_video_file.empty()) {
+            obj_detector.RunVideo(FLAGS_video_file, FLAGS_batch_size, FLAGS_height, FLAGS_width,
+                                  FLAGS_output_dir + "/" + filename_base(FLAGS_video_file),
+                                  FLAGS_output_video);
+        } else if (!FLAGS_image_files.empty()) {
+            for (const std::string& img_file : split(FLAGS_image_files, ',')) {
+                obj_detector.RunImage(img_file, FLAGS_height, FLAGS_width,
+                                      FLAGS_output_dir + "/" + filename_base(img_file));
+            }
         }
     }
 }

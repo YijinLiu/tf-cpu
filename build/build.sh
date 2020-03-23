@@ -2094,7 +2094,7 @@ install_opencv() {
         fi
     fi
     if [ "$OS" == "Darwin" ]; then
-        export CMAKE_LIBRARY_PATH=${PREFIX}/lib
+        export CMAKE_LIBRARY_PATH=${prefix}/lib
     fi
 
     mkdir -p build
@@ -2209,13 +2209,13 @@ install_opencv() {
 
 install_dldt() {
     if [ ! -d "dldt" ] ; then
-        git clone --depth=1 https://github.com/opencv/dldt -b 2019_R1.0.1
+        git clone --depth=1 https://github.com/opencv/dldt -b 2019_R1.1
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download Intel DLDT source!${NC}"
             return 1
         fi
-        cd dldt/inference-engine
+        cd dldt
         git submodule init && git submodule update --recursive
         rc=$?
         if [ $rc != 0 ]; then
@@ -2223,88 +2223,27 @@ install_dldt() {
             return 1
         fi
         sudo patch -l -p1 <<-EOD
-diff --git a/include/details/ie_so_pointer.hpp b/include/details/ie_so_pointer.hpp
-index a6d7372..15a9028 100644
---- a/include/details/ie_so_pointer.hpp
-+++ b/include/details/ie_so_pointer.hpp
-@@ -91,6 +91,8 @@ public:
-             SymbolLoader<Loader>(_so_loader).template instantiateSymbol<T>(SOCreatorTrait<T>::name))) {
-     }
- 
-+    explicit SOPointer(T* ptr) : _pointedObj(details::shared_from_irelease(ptr)) {}
-+
-     /**
-     * @brief The copy-like constructor, can create So Pointer that dereferenced into child type if T is derived of U
-     * @param that copied SOPointer object
-@@ -118,7 +120,7 @@ public:
-     }
- 
-     explicit operator bool() const noexcept {
--        return (nullptr != _so_loader) && (nullptr != _pointedObj);
-+        return (nullptr != _pointedObj);
-     }
- 
-     friend bool operator == (std::nullptr_t, const SOPointer& ptr) noexcept {
-diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index aad2b5b..2683f5c 100644
---- a/src/CMakeLists.txt
-+++ b/src/CMakeLists.txt
-@@ -35,6 +35,7 @@ endfunction()
- 
- add_subdirectory(extension EXCLUDE_FROM_ALL)
- add_library(IE::ie_cpu_extension ALIAS ie_cpu_extension)
-+add_library(IE::ie_cpu_extension_s ALIAS ie_cpu_extension_s)
- 
- file(GLOB_RECURSE EXTENSION_SOURCES extension/*.cpp extension/*.hpp extension/*.h)
- add_cpplint_target(ie_cpu_extension_cpplint FOR_SOURCES \${EXTENSION_SOURCES})
-diff --git a/src/extension/CMakeLists.txt b/src/extension/CMakeLists.txt
-index 19e7573..d824651 100644
---- a/src/extension/CMakeLists.txt
-+++ b/src/extension/CMakeLists.txt
-@@ -54,6 +54,14 @@ set_target_properties(\${TARGET_NAME} PROPERTIES COMPILE_PDB_NAME \${TARGET_NAME})
- 
- set_target_cpu_flags(\${TARGET_NAME})
- 
-+
-+add_library(\${TARGET_NAME}_s STATIC \${SRC} \${HDR})
-+set_ie_threading_interface_for(\${TARGET_NAME}_s)
-+target_include_directories(\${TARGET_NAME}_s PUBLIC \${CMAKE_CURRENT_SOURCE_DIR})
-+set_target_properties(\${TARGET_NAME}_s PROPERTIES COMPILE_PDB_NAME \${TARGET_NAME}_s)
-+set_target_cpu_flags(\${TARGET_NAME}_s)
-+
- if (IE_MAIN_SOURCE_DIR)
-     export(TARGETS \${TARGET_NAME} NAMESPACE IE:: APPEND FILE "\${CMAKE_BINARY_DIR}/targets.cmake")
-+    export(TARGETS \${TARGET_NAME}_s NAMESPACE IE:: APPEND FILE "\${CMAKE_BINARY_DIR}/targets.cmake")
- endif()
-diff --git a/thirdparty/mkl-dnn/cmake/SDL.cmake b/thirdparty/mkl-dnn/cmake/SDL.cmake
-index c4e0ab4..dd8217e 100644
---- a/thirdparty/mkl-dnn/cmake/SDL.cmake
-+++ b/thirdparty/mkl-dnn/cmake/SDL.cmake
-@@ -24,7 +24,7 @@ set(SDL_cmake_included true)
- include("cmake/utils.cmake")
- 
- if(UNIX)
--    set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")
-+    set(CMAKE_CCXX_FLAGS "-Wformat -Wformat-security")
-     append(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
-     append(CMAKE_C_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
-     if("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-@@ -53,7 +53,6 @@ if(UNIX)
-         append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-bind_at_load")
-         append(CMAKE_EXE_LINKER_FLAGS "-Wl,-bind_at_load")
-     else()
--        append(CMAKE_EXE_LINKER_FLAGS "-pie")
-         append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
-         append(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
-     endif()
-diff --git a/thirdparty/mkl-dnn/cmake/platform.cmake b/thirdparty/mkl-dnn/cmake/platform.cmake
-index a541215..ae790d2 100644
---- a/thirdparty/mkl-dnn/cmake/platform.cmake
-+++ b/thirdparty/mkl-dnn/cmake/platform.cmake
+diff --git a/inference-engine/CMakeLists.txt b/inference-engine/CMakeLists.txt
+index 1c3d6ea..79ef890 100644
+--- a/inference-engine/CMakeLists.txt
++++ b/inference-engine/CMakeLists.txt
+@@ -148,7 +148,7 @@ set (LIB_FOLDER \${IE_MAIN_SOURCE_DIR}/${BIN_FOLDER}/\${IE_BUILD_CONFIGURATION}/li
+
+ # gflags and format_reader targets are kept inside of samples directory and
+ # they must be built even if samples build is disabled (required for tests and tools).
+-add_subdirectory(samples)
++#add_subdirectory(samples)
+
+ file(GLOB_RECURSE SAMPLES_SOURCES samples/*.cpp samples/*.hpp samples/*.h)
+ add_cpplint_target(sample_cpplint
+diff --git a/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake b/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake
+index a541215..d3c4e1e 100644
+--- a/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake
++++ b/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake
 @@ -24,8 +24,6 @@ set(platform_cmake_included true)
- 
+
  include("cmake/utils.cmake")
- 
+
 -add_definitions(-DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS)
 -
  # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
@@ -2315,7 +2254,7 @@ index a541215..ae790d2 100644
      elseif("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
          if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
 -            set(DEF_ARCH_OPT_FLAGS "-march=native -mtune=native")
-+            set(DEF_ARCH_OPT_FLAGS "$mopts")
++            set(DEF_ARCH_OPT_FLAGS "${mopts}")
          endif()
          # suppress warning on assumptions made regarding overflow (#146)
          append(CMAKE_CCXX_NOWARN_FLAGS "-Wno-strict-overflow")
@@ -2326,37 +2265,32 @@ EOD
             return 1
         fi
     else
-        cd dldt/inference-engine
+        cd dldt
     fi
     mkdir -p build
     cd build
     cmake -DCMAKE_INSTALL_PREFIX=$prefix -DCMAKE_BUILD_TYPE=Release -DTHREADING=SEQ \
-          -DENABLE_PROFILING_ITT=OFF -DENABLE_OPENCV=OFF -DENABLE_SAMPLES=OFF \
-          -DENABLE_SAMPLES_CORE=OFF -DENABLE_SEGMENTATION_TESTS=OFF \
-          -DENABLE_OBJECT_DETECTION_TESTS=OFF .. &&
-    make -j $(nproc) all ie_cpu_extension_s
+          -DBUILD_TESTS=OFF \
+          -DENABLE_GNA=OFF -DENABLE_OBJECT_DETECTION_TESTS=OFF -DENABLE_OPENCV=OFF \
+          -DENABLE_PROFILING_ITT=OFF -DENABLE_SAMPLES=OFF -DENABLE_SAMPLES_CORE=OFF \
+          -DENABLE_SEGMENTATION_TESTS=OFF -DENABLE_TESTS=OFF \
+          -DNGRAPH_UNIT_TEST_ENABLE=OFF -DNGRAPH_TEST_UTIL_ENABLE=OFF ../inference-engine &&
+    make -j$(nproc) inference_engine MKLDNNPlugin clDNNPlugin myriadPlugin ie_cpu_extension
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to build DLDT inference engine!${NC}"
         return 1
     fi
-    cd ..
-    sudo mkdir -p $prefix/include $prefix/lib/dldt_ie_plugins &&
+    cd ../inference-engine
+    sudo mkdir -p $prefix/include &&
     sudo cp -r include $prefix/include/dldt &&
     sudo cp src/extension/ext_list.hpp $prefix/include/dldt &&
-    sudo cp bin/intel64/Release/lib/libinference_engine_s.a \
-            bin/intel64/Release/lib/libpugixml.a \
-            bin/intel64/Release/lib/libfluid.a \
-            bin/intel64/Release/lib/libcpu_extension.so \
-            bin/intel64/Release/lib/libie_cpu_extension_s.a \
-            bin/intel64/Release/lib/libclDNN64.so \
-            build/lib/libade.a $prefix/lib &&
-    sudo cp bin/intel64/Release/lib/libtest_MKLDNNPlugin.a $prefix/lib/libMKLDNNPlugin_s.a &&
-    sudo cp bin/intel64/Release/lib/libmkldnn.a $prefix/lib/libdldt_ie_mkldnn.a &&
-    sudo cp bin/intel64/Release/lib/libclDNNPlugin.so \
-            bin/intel64/Release/lib/libGNAPlugin.so \
-            bin/intel64/Release/lib/libHeteroPlugin.so \
-            bin/intel64/Release/lib/libMKLDNNPlugin.so $prefix/lib/dldt_ie_plugins
+    sudo cp -av bin/intel64/Release/lib/libinference_engine.so \
+                bin/intel64/Release/lib/libclDNNPlugin.so \
+                bin/intel64/Release/lib/libmyriadPlugin.so \
+                bin/intel64/Release/lib/libMKLDNNPlugin.so \
+                bin/intel64/Release/lib/libcpu_extension.so \
+                src/cldnn_engine/cldnn_global_custom_kernels $prefix/lib
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to install inference engine!${NC}"

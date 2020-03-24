@@ -85,11 +85,6 @@ run_obj_detect_dldt_model_%: $(TESTDATA)/%_frozen.xml $(TESTDATA)/%_frozen.bin $
 	$(BIN)/obj_detect_dldt \
 	    --model $(TESTDATA)/$*_frozen --device=$(DLDT_DEVICE) \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
-	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg \
-	    --output_dir=$*_dldt --logtostderr --run_count=$(RUN_COUNT) -v=$(VLOG_LEVEL)
-	$(BIN)/obj_detect_dldt \
-	    --model $(TESTDATA)/$*_frozen --device=$(DLDT_DEVICE) \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
 	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_dldt --logtostderr \
 	    --run_count=$(RUN_COUNT) -v=$(VLOG_LEVEL)
 
@@ -100,12 +95,9 @@ run_obj_detect_lite_model_%: $(TESTDATA)/%.tflite $(BIN)/obj_detect_lite
 	@echo -e "\e[0;92mRunning $*_lite ...\e[0m"
 	@mkdir -p $*_lite
 	$(BIN)/obj_detect_lite \
-	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg \
-	    --output_dir=$*_lite --model_file=$< -v=$(VLOG_LEVEL) \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
-	$(BIN)/obj_detect_lite \
 	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_lite --model_file=$< -v=$(VLOG_LEVEL) \
-	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
+		--run_count=$(RUN_COUNT)
 
 run_obj_detect: run_obj_detect_model_ssd_mobilenet_v1_coco_2017_11_17 \
                 run_obj_detect_model_ssd_mobilenet_v2_coco_2018_03_29 \
@@ -123,10 +115,7 @@ run_obj_detect_model_%: $(TESTDATA)/%_frozen.pb $(BIN)/obj_detect
 	@echo -e "\e[0;92mRunning $* ...\e[0m"
 	@mkdir -p $*
 	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/obj_detect \
-	    --image_files=$(TESTDATA)/dogs.jpeg,$(TESTDATA)/beach.jpeg,$(TESTDATA)/baby.jpeg --output_dir=$* \
-	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
-	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/obj_detect \
-	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$* \
+	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$* --run_count=$(RUN_COUNT) \
 	    --model_file=$< --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*)
 
 run_face_detect: $(BIN)/obj_detect \
@@ -222,9 +211,7 @@ $(BIN)/obj_detect_dldt.o: obj_detect_dldt.cc test_video.hpp video_encoder.hpp ut
 
 $(BIN)/obj_detect_dldt: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_dldt.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -linference_engine_s -lMKLDNNPlugin_s -linference_engine_s -lfluid -lade \
-	             -lpugixml -Wl,--whole-archive -lie_cpu_extension_s -Wl,--no-whole-archive \
-	             -ldldt_ie_mkldnn $(OPENCV_LDFLAGS) $(LDFLAGS)
+	g++ -o $@ $^ -linference_engine -lcpu_extension $(OPENCV_LDFLAGS) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)

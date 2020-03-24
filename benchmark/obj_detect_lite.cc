@@ -34,6 +34,7 @@ DEFINE_bool(output_video, true, "");
 DEFINE_int32(batch_size, 1, "");
 
 DEFINE_int32(ffmpeg_log_level, 8, "");
+DEFINE_int32(run_count, 1, "");
 
 namespace {
 
@@ -388,19 +389,22 @@ int main(int argc, char** argv) {
     if (!ReadLines(FLAGS_labels_file, &labels)) return 1;
     ObjDetector obj_detector;
     if (!obj_detector.Init(FLAGS_model_file, FLAGS_is_quantized_model, labels)) return 1;
-    if (!FLAGS_video_file.empty()) {
-        obj_detector.RunVideo(FLAGS_video_file, FLAGS_batch_size,
-                              FLAGS_output_dir + "/" + filename_base(FLAGS_video_file),
-                              FLAGS_output_video);
-    } else if (!FLAGS_image_files.empty()) {
-        for (const std::string& img_file : split(FLAGS_image_files, ',')) {
-            obj_detector.RunImage(img_file, FLAGS_output_dir + "/" + filename_base(img_file));
+    for (int i = 0; i < FLAGS_run_count; i++) {
+        if (!FLAGS_video_file.empty()) {
+            obj_detector.RunVideo(FLAGS_video_file, FLAGS_batch_size,
+                                  FLAGS_output_dir + "/" + filename_base(FLAGS_video_file),
+                                  FLAGS_output_video);
+        } else if (!FLAGS_image_files.empty()) {
+            for (const std::string& img_file : split(FLAGS_image_files, ',')) {
+                obj_detector.RunImage(img_file, FLAGS_output_dir + "/" + filename_base(img_file));
+            }
         }
     }
 }
 
 /*
 1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
+w/ 159M memory usage
 ssdlite_mobilenet_v2_coco10_lite/beach.mkv: 290 300x300 frames processed in 7843 ms(27 mspf).
 ssdlite_mobilenet_v2_mixed_lite/beach.mkv: 290 300x300 frames processed in 7845 ms(27 mspf).
 */

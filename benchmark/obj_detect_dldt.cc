@@ -131,8 +131,7 @@ class ObjDetector {
             }
             if (device == "CPU") {
                 plugin_ = PluginDispatcher({plugin_dir}).getPluginByName("MKLDNNPlugin");
-                cfgs[PluginConfigParams::KEY_CPU_BIND_THREAD] = PluginConfigParams::YES;
-                cfgs[PluginConfigParams::KEY_CPU_THROUGHPUT_STREAMS] = "1";
+                cfgs[PluginConfigParams::KEY_CPU_THREADS_NUM] = "1";
             } else {
                 plugin_ = PluginDispatcher({plugin_dir}).getPluginByName("clDNNPlugin");
                 cfgs[PluginConfigParams::KEY_CONFIG_FILE] =
@@ -475,6 +474,24 @@ int main(int argc, char *argv[]) {
 
 /*
 1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
-ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 300x300 frames processed in 6380 ms(22 mspf).
-ssdlite_mobilenet_v2_mixed_dldt/beach.mkv: 290 300x300 frames processed in 4640 ms(16 mspf).
+
+2019_R1.1 CPU w/ 122MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6381 ms(22 mspf).
+2019_R1.1 GPU w/ 256MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 7267 ms(25 mspf).
+
+2019_R2 CPU w/ 123MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6381 ms(22 mspf).
+R2 GPU w/ 329MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 5800 ms(20 mspf).
+
+2019_R3 CPU w/ 122MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6380 ms(22 mspf).
+2019_R3 GPU w/ 352MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6089 ms(20 mspf).
+
+2019_R3.1 CPU w/ 122MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6387 ms(22 mspf).
+2019_R3.1 GPU w/ 351MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6089 ms(20 mspf).
 */

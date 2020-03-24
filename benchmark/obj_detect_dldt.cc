@@ -10,6 +10,7 @@
 #include <tuple>
 #include <vector>
 
+#include <ext_list.hpp>
 #include <inference_engine.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -126,7 +127,6 @@ class ObjDetector {
             VLOG(1) << "InferenceEngine: " << VersionString(GetInferenceEngineVersion());
             err_listener_.set_prefix(Sprintf("[IE %s] ", device.c_str()));
             core_.SetLogCallback(err_listener_);
-            network_ = core_.ReadNetwork(model + ".xml", model + ".bin");
 
             std::map<std::string, std::string> cfgs;
             if (FLAGS_collect_perf_count) {
@@ -134,8 +134,14 @@ class ObjDetector {
             }
             if (device == "CPU") {
                 cfgs[PluginConfigParams::KEY_CPU_THREADS_NUM] = "1";
+                core_.AddExtension(std::make_shared<Extensions::Cpu::CpuExtensions>(), "CPU");
             }
             core_.SetConfig(cfgs);
+
+            CNNNetReader network_reader;
+            network_reader.ReadNetwork(model + ".xml");
+            network_reader.ReadWeights(model + ".bin");
+            network_ = network_reader.getNetwork();
 
             const auto input_info_map = network_.getInputsInfo();
             if (input_info_map.size() != 1) {

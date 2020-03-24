@@ -2209,7 +2209,7 @@ install_opencv() {
 
 install_dldt() {
     if [ ! -d "dldt" ] ; then
-        git clone --depth=1 https://github.com/opencv/dldt -b 2020.1
+        git clone --depth=1 https://github.com/opencv/dldt -b 2019_R2
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download Intel DLDT source!${NC}"
@@ -2223,29 +2223,20 @@ install_dldt() {
             return 1
         fi
         sudo patch -l -p1 <<-EOD
-diff --git a/cmake/os_flags.cmake b/cmake/os_flags.cmake
-index 6f70768..f6decad 100644
---- a/cmake/os_flags.cmake
-+++ b/cmake/os_flags.cmake
-@@ -155,7 +155,7 @@ else()
-         if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-             ie_add_compiler_flags(-Wno-error=switch)
-         else()
--            ie_add_compiler_flags(-Wmaybe-uninitialized)
-+            ie_add_compiler_flags(-Wmaybe-uninitialized -Wno-error=stringop-overflow=)
-         endif()
-     endif()
- 
 diff --git a/inference-engine/CMakeLists.txt b/inference-engine/CMakeLists.txt
-index d5feedb..1b7aa7e 100644
+index 0d449c9..d4e6ae4 100644
 --- a/inference-engine/CMakeLists.txt
 +++ b/inference-engine/CMakeLists.txt
-@@ -59,11 +59,11 @@ if(ENABLE_TESTS)
-     add_subdirectory(tests)
- endif()
+@@ -42,7 +42,7 @@ endif()
+ 
+ add_subdirectory(thirdparty)
  
 -add_subdirectory(tools)
 +#add_subdirectory(tools)
+ 
+ if (ENABLE_SAMPLES)
+     # hint for find_package(InferenceEngine in the samples folder)
+@@ -51,7 +51,7 @@ endif()
  
  # gflags and format_reader targets are kept inside of samples directory and
  # they must be built even if samples build is disabled (required for tests and tools).
@@ -2254,15 +2245,6 @@ index d5feedb..1b7aa7e 100644
  
  file(GLOB_RECURSE SAMPLES_SOURCES samples/*.cpp samples/*.hpp samples/*.h)
  add_cpplint_target(sample_cpplint
-@@ -134,7 +134,7 @@ install(DIRECTORY \${ie_python_api_SOURCE_DIR}/sample/
- add_custom_target(ie_dev_targets ALL DEPENDS inference_engine HeteroPlugin)
- 
- # Developer package
--ie_developer_export_targets(format_reader)
-+#ie_developer_export_targets(format_reader)
- 
- if (ENABLE_NGRAPH)
-     ie_developer_export_targets(\${NGRAPH_LIBRARIES})
 diff --git a/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake b/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake
 index a541215..ae790d2 100644
 --- a/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake
@@ -2301,29 +2283,31 @@ EOD
           -DENABLE_GNA=OFF -DENABLE_OBJECT_DETECTION_TESTS=OFF -DENABLE_OPENCV=OFF \
           -DENABLE_PROFILING_ITT=OFF -DENABLE_SAMPLES=OFF -DENABLE_SAMPLES_CORE=OFF \
           -DENABLE_SEGMENTATION_TESTS=OFF -DENABLE_TESTS=OFF \
-          -DNGRAPH_UNIT_TEST_ENABLE=OFF -DNGRAPH_TEST_UTIL_ENABLE=OFF .. &&
-    make -j$(nproc) inference_engine ie_plugins
+          -DNGRAPH_UNIT_TEST_ENABLE=OFF -DNGRAPH_TEST_UTIL_ENABLE=OFF ../inference-engine &&
+    make -j$(nproc) inference_engine ie_plugins ie_cpu_extension
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to build DLDT inference engine!${NC}"
         return 1
     fi
-    cd ..
+    cd ../inference-engine
     sudo mkdir -p $prefix/include &&
-    sudo cp -r inference-engine/include $prefix/include/dldt &&
+    sudo cp -r include $prefix/include/dldt &&
+    sudo cp src/extension/ext_list.hpp $prefix/include/dldt &&
     sudo cp -av bin/intel64/Release/lib/libinference_engine.so \
-                bin/intel64/Release/lib/libngraph.so \
                 bin/intel64/Release/lib/libclDNNPlugin.so \
+                bin/intel64/Release/lib/libclDNN64.so \
                 bin/intel64/Release/lib/libmyriadPlugin.so \
                 bin/intel64/Release/lib/libMKLDNNPlugin.so \
+                bin/intel64/Release/lib/libcpu_extension.so \
                 bin/intel64/Release/lib/plugins.xml \
-                inference-engine/src/cldnn_engine/cldnn_global_custom_kernels $prefix/lib
+                src/cldnn_engine/cldnn_global_custom_kernels $prefix/lib
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to install inference engine!${NC}"
         return 1
     fi
-    cd ..
+    cd ../..
 }
 
 install_gperftools &&

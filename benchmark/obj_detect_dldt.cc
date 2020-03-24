@@ -10,7 +10,6 @@
 #include <tuple>
 #include <vector>
 
-#include <ext_list.hpp>
 #include <inference_engine.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -122,33 +121,21 @@ class ObjDetector {
     ObjDetector(const std::vector<std::string>& labels) : labels_(labels) {};
 
     bool Init(const std::string& model, const std::string& plugin_dir, const std::string& device) {
-        VLOG(1) << "InferenceEngine: " << VersionString(GetInferenceEngineVersion());
-        err_listener_.set_prefix(Sprintf("[IE %s] ", device.c_str()));
+        device_ = device;
         try {
+            VLOG(1) << "InferenceEngine: " << VersionString(GetInferenceEngineVersion());
+            err_listener_.set_prefix(Sprintf("[IE %s] ", device.c_str()));
+            core_.SetLogCallback(err_listener_);
+            network_ = core_.ReadNetwork(model + ".xml", model + ".bin");
+
             std::map<std::string, std::string> cfgs;
             if (FLAGS_collect_perf_count) {
                 cfgs[PluginConfigParams::KEY_PERF_COUNT] = PluginConfigParams::YES;
             }
             if (device == "CPU") {
-                plugin_ = PluginDispatcher({plugin_dir}).getPluginByName("MKLDNNPlugin");
                 cfgs[PluginConfigParams::KEY_CPU_THREADS_NUM] = "1";
-            } else {
-                plugin_ = PluginDispatcher({plugin_dir}).getPluginByName("clDNNPlugin");
-                cfgs[PluginConfigParams::KEY_CONFIG_FILE] =
-                    plugin_dir + "/cldnn_global_custom_kernels/cldnn_global_custom_kernels.xml";
             }
-            plugin_.SetConfig(cfgs);
-            static_cast<InferenceEnginePluginPtr>(plugin_)->SetLogCallback(err_listener_);
-            if (device == "CPU") {
-                VLOG(1) << "Adding CPU extension...";
-                plugin_.AddExtension(std::make_shared<Extensions::Cpu::CpuExtensions>());
-            }
-            VLOG(1) << "InferenceEngine/" << device << ": " << VersionString(plugin_.GetVersion());
-
-            CNNNetReader networkReader;
-            networkReader.ReadNetwork(model + ".xml");
-            networkReader.ReadWeights(model + ".bin");
-            network_ = networkReader.getNetwork();
+            core_.SetConfig(cfgs);
 
             const auto input_info_map = network_.getInputsInfo();
             if (input_info_map.size() != 1) {
@@ -412,7 +399,7 @@ class ObjDetector {
             input_shape[2] = height;
             input_shape[3] = width;
             network_.reshape(input_shapes);
-            exe_network_ = plugin_.LoadNetwork(network_, {});
+            exe_network_ = core_.LoadNetwork(network_, device_, {});
             infer_request_ = exe_network_.CreateInferRequest();
             input_blob_ = infer_request_.GetBlob(input_name_);
             output_blob_ = infer_request_.GetBlob(output_name_);
@@ -423,8 +410,9 @@ class ObjDetector {
     }
 
     const std::vector<std::string> labels_;
+    std::string device_;
     ErrorListener err_listener_;
-    InferencePlugin plugin_;
+    Core core_;
     CNNNetwork network_;
     ExecutableNetwork exe_network_;
     InferRequest infer_request_;

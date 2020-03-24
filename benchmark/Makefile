@@ -211,7 +211,7 @@ $(BIN)/obj_detect_dldt.o: obj_detect_dldt.cc test_video.hpp video_encoder.hpp ut
 
 $(BIN)/obj_detect_dldt: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_dldt.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -linference_engine -lcpu_extension $(OPENCV_LDFLAGS) $(LDFLAGS)
+	g++ -o $@ $^ -linference_engine -lngraph $(OPENCV_LDFLAGS) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)

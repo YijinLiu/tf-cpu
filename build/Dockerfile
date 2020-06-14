@@ -3,7 +3,7 @@ FROM ubuntu:18.04
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt update && apt upgrade -y && \
     apt install -qq -y --no-install-recommends \
-        autoconf automake bash bash-completion build-essential ca-certificates clinfo cmake cpio \
+        autoconf automake bash bash-completion build-essential ca-certificates clinfo cpio \
         curl dpkg git libgfortran-5-dev libjpeg-dev libtool libusb-1.0-0-dev openjdk-8-jdk \
         pkg-config python python-future python3 python3-pip software-properties-common ssh sudo \
         tzdata unzip wget yasm zlib1g-dev && \

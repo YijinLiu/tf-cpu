@@ -188,8 +188,7 @@ $(BIN)/obj_detect_lite.o: $(SRC)/obj_detect_lite.cc $(SRC)/test_video.hpp \
 	mkdir -p $(BIN)
 	g++ -c $(CXXFLAGS) $< -o $@
 
-OPENCV_LDFLAGS=-lopencv_imgcodecs -lopencv_imgproc -lopencv_core \
-    -L/usr/local/share/OpenCV/3rdparty/lib -lippiw -lippicv -ljpeg
+OPENCV_LDFLAGS=-lopencv_imgcodecs -lopencv_imgproc -lopencv_core -ljpeg
 
 $(BIN)/obj_detect_lite: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_lite.o
 	mkdir -p $(BIN)
@@ -211,7 +210,7 @@ $(BIN)/obj_detect_dldt.o: obj_detect_dldt.cc test_video.hpp video_encoder.hpp ut
 
 $(BIN)/obj_detect_dldt: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_dldt.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -linference_engine -lcpu_extension $(OPENCV_LDFLAGS) $(LDFLAGS)
+	g++ -o $@ $^ -linference_engine -lngraph $(OPENCV_LDFLAGS) $(LDFLAGS)
 
 $(BIN)/simple_network.o: $(SRC)/simple_network.cc $(SRC)/simple_network.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)

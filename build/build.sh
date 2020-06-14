@@ -44,6 +44,38 @@ while true; do
 done
 echo -e ${GREEN}BLAS: $blas${NC}
 
+install_cmake() {
+    ver=3.15.0
+    if [ ! -d "cmake-$ver" ] ; then
+        if [ ! -f "cmake-$ver.tar.gz" ] ; then
+            wget https://github.com/Kitware/CMake/releases/download/v$ver/cmake-$ver.tar.gz
+            rc=$?
+            if [ $rc != 0 ]; then
+                echo -e "${RED}Failed to download cmake source code${NC}"
+                return 1
+            fi
+        fi
+        tar xvf cmake-$ver.tar.gz
+        rc=$?
+        if [ $rc != 0 ]; then
+            echo -e "${RED}Failed to extract cmake source code${NC}"
+            return 1
+        fi
+    fi
+    cd cmake-$ver
+    ./bootstrap --prefix=$prefix -- -DCMAKE_BUILD_TYPE:STRING=Release &&
+    ${MAKE} && sudo make install
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to build cmake${NC}"
+        return 1
+    fi
+    cd ..
+    if [ -n "$clean_asap" ] ; then
+        rm -rf cmake-$ver*
+    fi
+}
+
 install_gperftools() {
     # tcmalloc doesn't work on arm. No idea why.
     if [ "$ARCH" == "armv7l" ]; then
@@ -323,7 +355,7 @@ index 5929909..6244d1b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -73,7 +73,6 @@ include(CMakePackageConfigHelpers)
- 
+
  include("cmake/utils.cmake")
  include("cmake/options.cmake")
 -include("cmake/OpenMP.cmake")
@@ -340,7 +372,7 @@ index c404c17..d54b24e 100644
  set(MKL_cmake_included true)
 -include("cmake/utils.cmake")
 -include("cmake/options.cmake")
- 
+
 -# set SKIP_THIS_MKL to true if given configuration is not supported
 -function(maybe_skip_this_mkl LIBNAME)
 -    # Optimism...
@@ -623,7 +655,7 @@ index c404c17..d54b24e 100644
 +include_directories(AFTER \${MKLINC})
 +list(APPEND EXTRA_STATIC_LIBS -Wl,--start-group mkl_gf_lp64 mkl_sequential mkl_core -Wl,--end-group pthread dl)
 +SET(CMAKE_EXE_LINKER_FLAGS "\${CMAKE_EXE_LINKER_FLAGS} -L/usr/local/intel/mkl/lib")
-+ 
++
 +set(MSG "Intel(R) MKL:")
 +message(STATUS "\${MSG} include \${MKLINC}")
 +message(STATUS "\${MSG} lib \${MKLLIB}")
@@ -633,7 +665,7 @@ index c4e0ab4..dd8217e 100644
 +++ b/cmake/SDL.cmake
 @@ -24,7 +24,7 @@ set(SDL_cmake_included true)
  include("cmake/utils.cmake")
- 
+
  if(UNIX)
 -    set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")
 +    set(CMAKE_CCXX_FLAGS "-Wformat -Wformat-security")
@@ -653,9 +685,9 @@ index a541215..ae790d2 100644
 --- a/cmake/platform.cmake
 +++ b/cmake/platform.cmake
 @@ -24,8 +24,6 @@ set(platform_cmake_included true)
- 
+
  include("cmake/utils.cmake")
- 
+
 -add_definitions(-DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS)
 -
  # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
@@ -948,7 +980,7 @@ index 1329b568..b65bf883 100644
 @@ -265,6 +265,16 @@ Status SigmoidGrad(const Scope& scope, const Operation& op,
  }
  REGISTER_GRADIENT_OP("Sigmoid", SigmoidGrad);
- 
+
 +Status SigmoidWithCrossEntropyLossGrad(const Scope& scope,
 +                                       const Operation& op,
 +                                       const std::vector<Output>& grad_inputs,
@@ -969,7 +1001,7 @@ index 2a32a2ed..2768b205 100644
 @@ -125,6 +125,16 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
  }
  REGISTER_GRADIENT_OP("LogSoftmax", LogSoftmaxGrad);
- 
+
 +Status SoftmaxWithLogLikelihoodLossGrad(const Scope& scope,
 +                                        const Operation& op,
 +                                        const std::vector<Output>& grad_inputs,
@@ -990,7 +1022,7 @@ index 13f84313..cbea5ba5 100644
 @@ -81,17 +81,7 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  endif
  HOST_LDOPTS += -L/usr/local/lib
- 
+
 -HOST_INCLUDES := \\
 --I. \\
 --I\$(MAKEFILE_DIR)/../../../ \\
@@ -1009,7 +1041,7 @@ index 13f84313..cbea5ba5 100644
 @@ -99,13 +89,7 @@ endif
  # override local versions in the source tree.
  HOST_INCLUDES += -I/usr/local/include
- 
+
 -HOST_LIBS := \\
 -\$(HOST_NSYNC_LIB) \\
 --lstdc++ \\
@@ -1018,13 +1050,13 @@ index 13f84313..cbea5ba5 100644
 --lm \\
 --lz
 +HOST_LIBS := -lnsync_cpp -lnsync -ldouble-conversion -lprotobuf -labsl -lstdc++ -lpthread -lm -lz
- 
+
  # If we're on Linux, also link in the dl library.
  ifeq (\$(HOST_OS),LINUX)
 @@ -177,30 +161,28 @@ PROTOGENDIR := \$(GENDIR)proto/
  DEPDIR := \$(GENDIR)dep/
  \$(shell mkdir -p \$(DEPDIR) >/dev/null)
- 
+
 +BLAS?=MKL
 +BLAS_CXX_FLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 +BLAS_CXX_FLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
@@ -1038,19 +1070,19 @@ index 13f84313..cbea5ba5 100644
  CXX := \$(CC_PREFIX) gcc
 -OPTFLAGS := -O2
 +OPTFLAGS := -O3 \$(BLAS_CXX_FLAGS/\$(BLAS)) -DEIGEN_DONT_PARALLELIZE -DEIGEN_USE_VML -DEIGEN_AVOID_STL_ARRAY
- 
+
  ifneq (\$(TARGET),ANDROID)
 -  OPTFLAGS += -march=native
 +  OPTFLAGS += ${mopts}
  endif
- 
+
 -CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG \$(OPTFLAGS)
 -LDFLAGS := \\
 --L/usr/local/lib
 +CXXFLAGS := --std=c++11 -g1 -DIS_SLIM_BUILD -fexceptions -DNDEBUG \$(OPTFLAGS)
 +LDFLAGS := -L$prefix/lib
  DEPFLAGS = -MT \$@ -MMD -MP -MF \$(DEPDIR)/\$*.Td
- 
+
 -INCLUDES := \\
 --I. \\
 --I\$(MAKEFILE_DIR)/downloads/ \\
@@ -1069,7 +1101,7 @@ index 13f84313..cbea5ba5 100644
 @@ -218,12 +200,7 @@ ifeq (\$(WITH_TFLITE_FLEX), true)
  	INCLUDES += -I\$(MAKEFILE_DIR)/downloads/flatbuffers/include
  endif
- 
+
 -LIBS := \\
 -\$(TARGET_NSYNC_LIB) \\
 --lstdc++ \\
@@ -1077,7 +1109,7 @@ index 13f84313..cbea5ba5 100644
 --lz \\
 --lm
 +LIBS := \$(BLAS_LD_FLAGS/\$(BLAS)) -lnsync_cpp -lnsync -ldouble-conversion -labsl -lstdc++ -lprotobuf -lz -lm
- 
+
  ifeq (\$(HAS_GEN_HOST_PROTOC),true)
  	PROTOC := \$(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc
 @@ -253,7 +230,6 @@ ifeq (\$(HAS_GEN_HOST_PROTOC),true)
@@ -1090,7 +1122,7 @@ index 13f84313..cbea5ba5 100644
  endif
 @@ -370,7 +346,7 @@ \$(MARCH_OPTION) \\
  -I\$(PBTGENDIR)
- 
+
  	LIBS := \\
 -\$(TARGET_NSYNC_LIB) \\
 +-lnsync \\
@@ -1099,7 +1131,7 @@ index 13f84313..cbea5ba5 100644
  -llog \\
 @@ -633,7 +609,6 @@ BENCHMARK_NAME := \$(BINDIR)benchmark
  # gen_file_lists.sh script.
- 
+
  CORE_CC_ALL_SRCS := \\
 -\$(ABSL_CC_SRCS) \\
  tensorflow/c/c_api.cc \\
@@ -1323,18 +1355,18 @@ index 13f84313..cbea5ba5 100644
 +BENCHMARK_MODEL_OBJS := \$(OBJDIR)tensorflow/core/util/reporter.o \\
 +                        \$(OBJDIR)tensorflow/tools/benchmark/benchmark_model.o \\
 +                        \$(OBJDIR)tensorflow/tools/benchmark/benchmark_model_main.o
- 
+
  .PHONY: clean cleantarget
- 
+
 +SUMMARIZE_GRAPH := \$(BINDIR)summarize_graph
 +BENCHMARK_MODEL := \$(BINDIR)benchmark_model
 +
  # The target that's compiled if there's no command-line arguments.
 -all: \$(LIB_PATH) \$(BENCHMARK_NAME)
 +all: \$(LIB_PATH) \$(SUMMARIZE_GRAPH) \$(BENCHMARK_MODEL)
- 
+
  # Rules for target compilation.
- 
+
 -
  .phony_version_info:
  tensorflow/core/util/version_info.cc: .phony_version_info
@@ -1342,7 +1374,7 @@ index 13f84313..cbea5ba5 100644
 @@ -834,6 +1002,16 @@ \$(BENCHMARK_NAME): \$(BENCHMARK_OBJS) \$(LIB_PATH) \$(CUDA_LIB_DEPS)
  	-o \$(BENCHMARK_NAME) \$(BENCHMARK_OBJS) \\
  	\$(LIBFLAGS) \$(TEGRA_LIBS) \$(LIB_PATH) \$(LDFLAGS) \$(LIBS) \$(CUDA_LIBS)
- 
+
 +\$(SUMMARIZE_GRAPH): \$(SUMMARIZE_GRAPH_OBJS) \$(LIB_PATH)
 +	@mkdir -p \$(dir \$@)
 +	\$(CXX) \$(CXXFLAGS) \$(INCLUDES) -o \$@ \$(SUMMARIZE_GRAPH_OBJS) \\
@@ -1362,7 +1394,7 @@ index 6e7393e3..fe948d3d 100644
 +++ b/tensorflow/core/graph/mkl_layout_pass.cc
 @@ -347,10 +347,10 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
      // End - element-wise ops. See note above.
- 
+
      // NOTE: names are alphabetically sorted.
 -    rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
 -                      CopyAttrsAddN, AlwaysRewrite});
@@ -1425,7 +1457,7 @@ index f7af7cc3..ff95ac2f 100644
 --- a/tensorflow/core/grappler/clusters/utils.cc
 +++ b/tensorflow/core/grappler/clusters/utils.cc
 @@ -154,19 +154,6 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
- 
+
    if (device.type == "CPU") {
      return GetLocalCPUInfo();
 -  } else if (device.type == "GPU") {
@@ -1449,7 +1481,7 @@ index d45bb14e..e59c8c01 100644
 --- a/tensorflow/core/grappler/costs/utils.cc
 +++ b/tensorflow/core/grappler/costs/utils.cc
 @@ -239,16 +239,7 @@ DeviceProperties GetDeviceInfo(const string& device_str) {
- 
+
    DeviceNameUtils::ParsedName parsed;
    if (DeviceNameUtils::ParseFullName(device_str, &parsed)) {
 -    if (parsed.type == "GPU") {
@@ -1473,15 +1505,15 @@ index c132fdb6..c07ef055 100644
 @@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
  limitations under the License.
  ==============================================================================*/
- 
+
 +#include "tensorflow/core/framework/register_types.h"
  #include "tensorflow/core/kernels/cwise_ops_common.h"
  #include "tensorflow/core/kernels/cwise_ops_gradients.h"
- 
+
 @@ -37,4 +38,51 @@ REGISTER3(SimpleBinaryOp, GPU, "SigmoidGrad", functor::sigmoid_grad, float,
  REGISTER(SimpleBinaryOp, SYCL, "SigmoidGrad", functor::sigmoid_grad, float);
  #endif  // TENSORFLOW_USE_SYCL
- 
+
 +template <typename Device, typename T>
 +class SigmoidWithCrossEntropyLossOp : public OpKernel {
 + public:
@@ -1537,7 +1569,7 @@ index 0d5a42bf..0b5f00a6 100644
 @@ -23,6 +23,23 @@ limitations under the License.
  #include <arm_neon.h>
  #endif
- 
+
 +#if defined __GNUC__ && defined __SSE4_1__
 +#define USE_NEON
 +
@@ -1557,27 +1589,27 @@ index 0d5a42bf..0b5f00a6 100644
 +
  namespace tensorflow {
  namespace neon {
- 
+
 diff --git a/tensorflow/core/kernels/softmax_op.cc b/tensorflow/core/kernels/softmax_op.cc
 index 93a75378..6bdc8716 100644
 --- a/tensorflow/core/kernels/softmax_op.cc
 +++ b/tensorflow/core/kernels/softmax_op.cc
 @@ -15,6 +15,8 @@ limitations under the License.
- 
+
  // See docs in ../ops/nn_ops.cc.
- 
+
 +#include <math.h>
 +
  #include "tensorflow/core/lib/strings/str_util.h"
  #define EIGEN_USE_THREADS
- 
+
 @@ -23,6 +25,7 @@ limitations under the License.
  #include "tensorflow/core/framework/register_types.h"
  #include "tensorflow/core/framework/tensor.h"
  #include "tensorflow/core/framework/tensor_shape.h"
 +#include "tensorflow/core/kernels/cwise_ops.h"
  #include "tensorflow/core/kernels/softmax_op_functor.h"
- 
+
  namespace tensorflow {
 @@ -103,4 +106,84 @@ REGISTER_KERNEL_BUILDER(
      Name("Softmax").Device(DEVICE_SYCL).TypeConstraint<double>("T"),
@@ -1671,7 +1703,7 @@ index 3ff9bc09..e6b889c0 100644
 @@ -327,6 +327,28 @@ expected to create these operators.
  #undef UNARY_REAL
  #undef UNARY_COMPLEX
- 
+
 +REGISTER_OP("SigmoidWithCrossEntropyLoss")
 +    .Input("logits: T")
 +    .Input("labels: int32")
@@ -1702,9 +1734,9 @@ index fe69a7a2..a9fb3d16 100644
 --- a/tensorflow/core/ops/nn_ops.cc
 +++ b/tensorflow/core/ops/nn_ops.cc
 @@ -1139,6 +1139,50 @@ REGISTER_OP("LogSoftmax")
- 
+
  // --------------------------------------------------------------------------
- 
+
 +REGISTER_OP("SimpleLossGrad")
 +    .Input("output: T")
 +    .Input("labels: int32")
@@ -1845,7 +1877,7 @@ index 9edef375..025709c5 100644
 @@ -20,6 +20,8 @@ limitations under the License.
  #include <cstdint>
  #include <cstring>
- 
+
 +#include <Eigen/Core>
 +
  #include "tensorflow/lite/c/c_api_internal.h"
@@ -1863,14 +1895,14 @@ index 8543600e..4dc84321 100644
 -            tflite::ops::custom::Register_AUDIO_SPECTROGRAM());
    AddCustom("TFLite_Detection_PostProcess",
              tflite::ops::custom::Register_DETECTION_POSTPROCESS());
- 
+
 diff --git a/tensorflow/lite/nnapi/NeuralNetworksShim.h b/tensorflow/lite/nnapi/NeuralNetworksShim.h
 index c48528fa..625cc86d 100644
 --- a/tensorflow/lite/nnapi/NeuralNetworksShim.h
 +++ b/tensorflow/lite/nnapi/NeuralNetworksShim.h
 @@ -80,8 +80,12 @@ inline void* loadFunction(const char* name) {
  }
- 
+
  inline bool NNAPIExists() {
 +#ifdef __ANDROID__
    static bool nnapi_is_available = getLibraryHandle();
@@ -1879,7 +1911,7 @@ index c48528fa..625cc86d 100644
 +  return false;
 +#endif
  }
- 
+
  // NN api types based on NNAPI header file
 EOD
         rc=$?
@@ -2209,7 +2241,7 @@ install_opencv() {
 
 install_dldt() {
     if [ ! -d "dldt" ] ; then
-        git clone --depth=1 https://github.com/opencv/dldt -b 2019_R2
+        git clone --depth=1 https://github.com/opencv/dldt -b 2020.3.0
         rc=$?
         if [ $rc != 0 ]; then
             echo -e "${RED}Failed to download Intel DLDT source!${NC}"
@@ -2223,20 +2255,29 @@ install_dldt() {
             return 1
         fi
         sudo patch -l -p1 <<-EOD
+diff --git a/cmake/os_flags.cmake b/cmake/os_flags.cmake
+index a91c464..194ccdf 100644
+--- a/cmake/os_flags.cmake
++++ b/cmake/os_flags.cmake
+@@ -270,7 +270,7 @@ else()
+         if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+             ie_add_compiler_flags(-Wno-error=switch)
+         else()
+-            ie_add_compiler_flags(-Wmaybe-uninitialized)
++            ie_add_compiler_flags(-Wmaybe-uninitialized -Wno-error=stringop-overflow=)
+         endif()
+     endif()
+ 
 diff --git a/inference-engine/CMakeLists.txt b/inference-engine/CMakeLists.txt
-index 0d449c9..d4e6ae4 100644
+index 60743b6..e776562 100644
 --- a/inference-engine/CMakeLists.txt
 +++ b/inference-engine/CMakeLists.txt
-@@ -42,7 +42,7 @@ endif()
- 
- add_subdirectory(thirdparty)
+@@ -72,11 +72,11 @@ if(ENABLE_TESTS)
+     add_subdirectory(tests)
+ endif()
  
 -add_subdirectory(tools)
 +#add_subdirectory(tools)
- 
- if (ENABLE_SAMPLES)
-     # hint for find_package(InferenceEngine in the samples folder)
-@@ -51,7 +51,7 @@ endif()
  
  # gflags and format_reader targets are kept inside of samples directory and
  # they must be built even if samples build is disabled (required for tests and tools).
@@ -2245,8 +2286,66 @@ index 0d449c9..d4e6ae4 100644
  
  file(GLOB_RECURSE SAMPLES_SOURCES samples/*.cpp samples/*.hpp samples/*.h)
  add_cpplint_target(sample_cpplint
+@@ -154,7 +154,7 @@ endif()
+ # Developer package
+ #
+ 
+-ie_developer_export_targets(format_reader)
++#ie_developer_export_targets(format_reader)
+ ie_developer_export_targets(\${NGRAPH_LIBRARIES})
+ 
+ ie_developer_export()
+diff --git a/inference-engine/src/inference_engine/CMakeLists.txt b/inference-engine/src/inference_engine/CMakeLists.txt
+index c8cd4b2..9256b38 100644
+--- a/inference-engine/src/inference_engine/CMakeLists.txt
++++ b/inference-engine/src/inference_engine/CMakeLists.txt
+@@ -152,13 +152,14 @@ add_clang_format_target(\${TARGET_NAME}_clang_format FOR_TARGETS \${TARGET_NAME}_o
+ 
+ add_library(\${TARGET_NAME} SHARED
+             $<TARGET_OBJECTS:\${TARGET_NAME}_obj>
++            $<TARGET_OBJECTS:\${TARGET_NAME}_common_obj>
+             \${IE_STATIC_DEPENDENT_FILES})
+ 
+ set_ie_threading_interface_for(\${TARGET_NAME})
+ 
+ target_link_libraries(\${TARGET_NAME} PRIVATE Threads::Threads \${INTEL_ITT_LIBS} pugixml
+                                              \${NGRAPH_LIBRARIES} inference_engine_transformations
+-                                     PUBLIC \${CMAKE_DL_LIBS} \${TARGET_NAME}_legacy)
++                                     PUBLIC \${CMAKE_DL_LIBS} \${TARGET_NAME}_legacy_obj)
+ 
+ target_include_directories(\${TARGET_NAME} INTERFACE \${PUBLIC_HEADERS_DIR}
+                                           PRIVATE $<TARGET_PROPERTY:\${TARGET_NAME}_plugin_api,INTERFACE_INCLUDE_DIRECTORIES>)
+diff --git a/inference-engine/src/low_precision_transformations/CMakeLists.txt b/inference-engine/src/low_precision_transformations/CMakeLists.txt
+index ec3a9e3..376e02e 100644
+--- a/inference-engine/src/low_precision_transformations/CMakeLists.txt
++++ b/inference-engine/src/low_precision_transformations/CMakeLists.txt
+@@ -21,7 +21,7 @@ source_group("include" FILES \${PUBLIC_HEADERS})
+ 
+ # Create shared library
+ 
+-add_library(\${TARGET_NAME} SHARED
++add_library(\${TARGET_NAME} STATIC
+             \${LIBRARY_SRC}
+             \${PUBLIC_HEADERS})
+ 
+diff --git a/inference-engine/src/transformations/CMakeLists.txt b/inference-engine/src/transformations/CMakeLists.txt
+index 5e37324..07778ce 100644
+--- a/inference-engine/src/transformations/CMakeLists.txt
++++ b/inference-engine/src/transformations/CMakeLists.txt
+@@ -19,9 +19,9 @@ set(PUBLIC_HEADERS_DIR "\${CMAKE_CURRENT_SOURCE_DIR}/include")
+ source_group("src" FILES \${LIBRARY_SRC})
+ source_group("include" FILES \${PUBLIC_HEADERS})
+ 
+-# Create shared library
++# Create static library
+ 
+-add_library(\${TARGET_NAME} SHARED \${LIBRARY_SRC} \${PUBLIC_HEADERS})
++add_library(\${TARGET_NAME} STATIC \${LIBRARY_SRC} \${PUBLIC_HEADERS})
+ 
+ target_compile_definitions(\${TARGET_NAME} PRIVATE IMPLEMENT_INFERENCE_ENGINE_API)
+ 
 diff --git a/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake b/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake
-index a541215..ae790d2 100644
+index e9c9f31..3c529d3 100644
 --- a/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake
 +++ b/inference-engine/thirdparty/mkl-dnn/cmake/platform.cmake
 @@ -24,8 +24,6 @@ set(platform_cmake_included true)
@@ -2258,7 +2357,7 @@ index a541215..ae790d2 100644
  # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
  # C++ standard (see C99 standard 7.18.2 and 7.18.4)
  add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
-@@ -113,7 +111,7 @@ elseif(UNIX OR MINGW)
+@@ -118,7 +116,7 @@ elseif(UNIX OR MINGW)
          endif()
      elseif("\${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
          if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
@@ -2279,37 +2378,36 @@ EOD
     mkdir -p build
     cd build
     cmake -DCMAKE_INSTALL_PREFIX=$prefix -DCMAKE_BUILD_TYPE=Release -DTHREADING=SEQ \
-          -DBUILD_TESTS=OFF \
+          -DCMAKE_SKIP_RPATH=TRUE -DBUILD_TESTS=OFF \
           -DENABLE_GNA=OFF -DENABLE_OBJECT_DETECTION_TESTS=OFF -DENABLE_OPENCV=OFF \
           -DENABLE_PROFILING_ITT=OFF -DENABLE_SAMPLES=OFF -DENABLE_SAMPLES_CORE=OFF \
           -DENABLE_SEGMENTATION_TESTS=OFF -DENABLE_TESTS=OFF \
-          -DNGRAPH_UNIT_TEST_ENABLE=OFF -DNGRAPH_TEST_UTIL_ENABLE=OFF ../inference-engine &&
-    make -j$(nproc) inference_engine ie_plugins ie_cpu_extension
+          -DNGRAPH_UNIT_TEST_ENABLE=OFF -DNGRAPH_TEST_UTIL_ENABLE=OFF .. &&
+    make -j$(nproc) VERBOSE=1 inference_engine ie_plugins
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to build DLDT inference engine!${NC}"
         return 1
     fi
-    cd ../inference-engine
+    cd ..
     sudo mkdir -p $prefix/include &&
-    sudo cp -r include $prefix/include/dldt &&
-    sudo cp src/extension/ext_list.hpp $prefix/include/dldt &&
+    sudo cp -r inference-engine/include $prefix/include/dldt &&
     sudo cp -av bin/intel64/Release/lib/libinference_engine.so \
+                bin/intel64/Release/lib/libngraph.so \
                 bin/intel64/Release/lib/libclDNNPlugin.so \
-                bin/intel64/Release/lib/libclDNN64.so \
                 bin/intel64/Release/lib/libmyriadPlugin.so \
                 bin/intel64/Release/lib/libMKLDNNPlugin.so \
-                bin/intel64/Release/lib/libcpu_extension.so \
                 bin/intel64/Release/lib/plugins.xml \
-                src/cldnn_engine/cldnn_global_custom_kernels $prefix/lib
+                inference-engine/src/cldnn_engine/cldnn_global_custom_kernels $prefix/lib
     rc=$?
     if [ $rc != 0 ]; then
         echo -e "${RED}Failed to install inference engine!${NC}"
         return 1
     fi
-    cd ../..
+    cd ..
 }
 
+install_cmake &&
 install_gperftools &&
 install_abseil_cpp &&
 install_blas &&

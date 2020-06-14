@@ -10,7 +10,6 @@
 #include <tuple>
 #include <vector>
 
-#include <ext_list.hpp>
 #include <inference_engine.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -52,20 +51,6 @@ bool ReadLines(const std::string& file_name, std::vector<std::string>* lines) {
     while (std::getline(file, line)) lines->push_back(line);
     return true;
 }
-
-class ErrorListener : public InferenceEngine::IErrorListener {
-  public:
-    ErrorListener() {}
-    
-    void set_prefix(const std::string& prefix) { prefix_ = prefix; }
-
-  private:
-    void onError(const char* msg) noexcept override {
-        VLOG(-1) << prefix_ << msg;
-    }
-
-    std::string prefix_;
-};
 
 std::string VersionString(const Version* version) {
     return Sprintf("%d.%d.%s(%s)", version->apiVersion.major, version->apiVersion.minor,
@@ -125,8 +110,14 @@ class ObjDetector {
         device_ = device;
         try {
             VLOG(1) << "InferenceEngine: " << VersionString(GetInferenceEngineVersion());
-            err_listener_.set_prefix(Sprintf("[IE %s] ", device.c_str()));
-            core_.SetLogCallback(err_listener_);
+            /*{
+                VLOG(1) << "Available devices: ";
+                Core core;
+                const auto devices = core.GetAvailableDevices();
+                for (const auto& device : devices) {
+                    VLOG(1) << "\t" << device;
+                }
+            }*/
 
             std::map<std::string, std::string> cfgs;
             if (FLAGS_collect_perf_count) {
@@ -134,14 +125,10 @@ class ObjDetector {
             }
             if (device == "CPU") {
                 cfgs[PluginConfigParams::KEY_CPU_THREADS_NUM] = "1";
-                core_.AddExtension(std::make_shared<Extensions::Cpu::CpuExtensions>(), "CPU");
             }
             core_.SetConfig(cfgs);
 
-            CNNNetReader network_reader;
-            network_reader.ReadNetwork(model + ".xml");
-            network_reader.ReadWeights(model + ".bin");
-            network_ = network_reader.getNetwork();
+            network_ = core_.ReadNetwork(model + ".xml", model + ".bin");
 
             const auto input_info_map = network_.getInputsInfo();
             if (input_info_map.size() != 1) {
@@ -417,7 +404,6 @@ class ObjDetector {
 
     const std::vector<std::string> labels_;
     std::string device_;
-    ErrorListener err_listener_;
     Core core_;
     CNNNetwork network_;
     ExecutableNetwork exe_network_;
@@ -488,4 +474,7 @@ ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processe
 ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6387 ms(22 mspf).
 2019_R3.1 GPU w/ 351MB memory usage
 ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6089 ms(20 mspf).
+
+2020.3 LTS CPU w/ 125MB memory usage
+ssdlite_mobilenet_v2_coco_2018_05_09_dldt/beach.mkv: 290 300x300 frames processed in 6446 ms(22 mspf).
 */

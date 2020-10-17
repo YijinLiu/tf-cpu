@@ -1,0 +1,81 @@
+diff --git a/inference-engine/CMakeLists.txt b/inference-engine/CMakeLists.txt
+index 7f45ab0..73d8d74 100644
+--- a/inference-engine/CMakeLists.txt
++++ b/inference-engine/CMakeLists.txt
+@@ -70,7 +70,7 @@ if(ENABLE_TESTS)
+     add_subdirectory(tests)
+ endif()
+ 
+-add_subdirectory(tools)
++#add_subdirectory(tools)
+ 
+ function(ie_build_samples)
+     # samples should be build with the same flags as from OpenVINO package,
+@@ -89,7 +89,7 @@ endfunction()
+ 
+ # gflags and format_reader targets are kept inside of samples directory and
+ # they must be built even if samples build is disabled (required for tests and tools).
+-ie_build_samples()
++#ie_build_samples()
+ 
+ file(GLOB_RECURSE SAMPLES_SOURCES samples/*.cpp samples/*.hpp samples/*.h)
+ add_cpplint_target(sample_cpplint
+@@ -180,7 +180,7 @@ endif()
+ # Developer package
+ #
+ 
+-ie_developer_export_targets(format_reader)
++#ie_developer_export_targets(format_reader)
+ ie_developer_export_targets(${NGRAPH_LIBRARIES})
+ 
+ # for Template plugin
+diff --git a/inference-engine/src/inference_engine/CMakeLists.txt b/inference-engine/src/inference_engine/CMakeLists.txt
+index 9ab8889..e26dc3a 100644
+--- a/inference-engine/src/inference_engine/CMakeLists.txt
++++ b/inference-engine/src/inference_engine/CMakeLists.txt
+@@ -161,13 +161,14 @@ add_cpplint_target(${TARGET_NAME}_cpplint FOR_TARGETS ${TARGET_NAME}_obj)
+ 
+ add_library(${TARGET_NAME} SHARED
+             ${IE_STATIC_DEPENDENT_FILES}
+-            $<TARGET_OBJECTS:${TARGET_NAME}_obj>)
++            $<TARGET_OBJECTS:${TARGET_NAME}_obj>
++            $<TARGET_OBJECTS:${TARGET_NAME}_common_obj>)
+ 
+ set_ie_threading_interface_for(${TARGET_NAME})
+ 
+ target_link_libraries(${TARGET_NAME} PRIVATE ${CMAKE_DL_LIBS} Threads::Threads pugixml openvino::itt
+                                              ${NGRAPH_LIBRARIES} inference_engine_transformations
+-                                     PUBLIC ${TARGET_NAME}_legacy)
++                                     PUBLIC ${TARGET_NAME}_legacy_obj)
+ 
+ target_include_directories(${TARGET_NAME} INTERFACE ${PUBLIC_HEADERS_DIR} PRIVATE
+                                                 $<TARGET_PROPERTY:${TARGET_NAME}_plugin_api,INTERFACE_INCLUDE_DIRECTORIES>)
+diff --git a/inference-engine/src/low_precision_transformations/CMakeLists.txt b/inference-engine/src/low_precision_transformations/CMakeLists.txt
+index c5ad284..c943a42 100644
+--- a/inference-engine/src/low_precision_transformations/CMakeLists.txt
++++ b/inference-engine/src/low_precision_transformations/CMakeLists.txt
+@@ -21,7 +21,7 @@ source_group("include" FILES ${PUBLIC_HEADERS})
+ 
+ # Create shared library
+ 
+-add_library(${TARGET_NAME} SHARED
++add_library(${TARGET_NAME} STATIC
+             ${LIBRARY_SRC}
+             ${PUBLIC_HEADERS})
+ 
+diff --git a/inference-engine/src/transformations/CMakeLists.txt b/inference-engine/src/transformations/CMakeLists.txt
+index f7c579b..6850d6e 100644
+--- a/inference-engine/src/transformations/CMakeLists.txt
++++ b/inference-engine/src/transformations/CMakeLists.txt
+@@ -19,9 +19,9 @@ set(PUBLIC_HEADERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
+ source_group("src" FILES ${LIBRARY_SRC})
+ source_group("include" FILES ${PUBLIC_HEADERS})
+ 
+-# Create shared library
++# Create static library
+ 
+-add_library(${TARGET_NAME} SHARED ${LIBRARY_SRC} ${PUBLIC_HEADERS})
++add_library(${TARGET_NAME} STATIC ${LIBRARY_SRC} ${PUBLIC_HEADERS})
+ 
+ target_link_libraries(${TARGET_NAME} PUBLIC ${NGRAPH_LIBRARIES}
+                                      PRIVATE openvino::itt ngraph::builder)

@@ -73,8 +73,7 @@ run_classify: $(BIN)/classify \
               $(TESTDATA)/mobilenet_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/classify
 
-run_obj_detect_dldt: run_obj_detect_dldt_model_ssdlite_mobilenet_v2_coco_2018_05_09 \
-                     run_obj_detect_dldt_model_ssdlite_mobilenet_v2_mixed
+run_obj_detect_dldt: run_obj_detect_dldt_model_ssdlite_mobilenet_v2_mixed
 
 RUN_COUNT?=1
 DLDT_DEVICE?=CPU
@@ -135,25 +134,21 @@ train_mnist: $(BIN)/mnist \
 
 PREFIX?=/usr/local
 BLAS?=MKL
+
 # Don't unset this. Use TF_DISABLE_MKL=1 to disable MKL.
-USE_MKLDNN?=1
 BLAS_CXXFLAGS/ATLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 BLAS_CXXFLAGS/OpenBLAS:=-DEIGEN_USE_BLAS -DEIGEN_USE_LAPACKE
 BLAS_CXXFLAGS/MKL:=-DINTEL_MKL -DEIGEN_USE_MKL_ALL -I$(PREFIX)/intel/mkl/include -I$(PREFIX)/intel/mkldnn/include
+
 BLAS_LDFLAGS/ATLAS:=-L$(PREFIX)/ATLAS/lib -llapack -lcblas -lf77blas -latlas -lgfortran -lquadmath
 BLAS_LDFLAGS/OpenBLAS:=-L$(PREFIX)/OpenBLAS/lib -Wl,-Bstatic -lopenblas -lgfortran -lquadmath -Wl,-Bdynamic
 # See https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor/
 BLAS_LDFLAGS/MKL:=-L$(PREFIX)/intel/mkl/lib -Wl,--start-group -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -Wl,--end-group
-ifneq ($(USE_MKLDNN),)
-	BLAS_LDFLAGS/MKL:=-L$(PREFIX)/intel/mkldnn/lib -lmkldnn $(BLAS_LDFLAGS/MKL)
-else
-	BLAS_CXXFLAGS/MKL += -DINTEL_MKL_ML_ONLY
-endif
 
 CXXFLAGS:=-g -O3 -pthread -std=c++11 -DNDEBUG -D_POSIX_C_SOURCE=200809L -D_FILE_OFFSET_BITS=64 \
-          -fno-exceptions -funwind-tables -fvisibility-inlines-hidden -I$(PREFIX)/include/eigen3
+          -fno-exceptions -funwind-tables -fvisibility-inlines-hidden -fPIC -I$(PREFIX)/include/eigen3
 
-LDFLAGS:=-Wl,-Bstatic -lbenchmark -lglog -lgflags -lstdc++ \
+LDFLAGS:=-Wl,-Bstatic -lbenchmark -lglog -lgflags -lprotobuf -lstdc++ \
          -lavformat -lavcodec -lavfilter -lavdevice -lswscale -lavutil -lx264 -lz \
          -Wl,-Bdynamic -lpthread -ldl
 
@@ -171,7 +166,7 @@ $(BIN)/classify_lite.o: $(SRC)/classify_lite.cc $(SRC)/test_video.hpp $(SRC)/uti
 
 $(BIN)/classify_lite: $(BIN)/test_video.o $(BIN)/classify_lite.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -ltensorflow-lite -lfarmhash $(LDFLAGS)
+	g++ -o $@ $^ -ltensorflow-lite $(LDFLAGS)
 
 $(BIN)/classify.o: $(SRC)/classify.cc $(SRC)/test_video.hpp $(SRC)/utils.hpp
 	mkdir -p $(BIN)
@@ -179,9 +174,7 @@ $(BIN)/classify.o: $(SRC)/classify.cc $(SRC)/test_video.hpp $(SRC)/utils.hpp
 
 $(BIN)/classify: $(BIN)/test_video.o $(BIN)/classify.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion -labsl \
-        $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	g++ -o $@ $^ -ltensorflow_cc $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/obj_detect_lite.o: $(SRC)/obj_detect_lite.cc $(SRC)/test_video.hpp \
                           $(SRC)/video_encoder.hpp $(SRC)/utils.hpp
@@ -192,7 +185,7 @@ OPENCV_LDFLAGS=-lopencv_imgcodecs -lopencv_imgproc -lopencv_core -ljpeg
 
 $(BIN)/obj_detect_lite: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_lite.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -ltensorflow-lite -lfarmhash -lflatbuffers $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	g++ -o $@ $^ -ltensorflow-lite $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/obj_detect.o: obj_detect.cc test_video.hpp video_encoder.hpp utils.hpp
 	mkdir -p $(BIN)
@@ -200,13 +193,11 @@ $(BIN)/obj_detect.o: obj_detect.cc test_video.hpp video_encoder.hpp utils.hpp
 
 $(BIN)/obj_detect: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync_cpp -lnsync -ldouble-conversion -labsl \
-	    $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	g++ -o $@ $^ -ltensorflow_cc $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/obj_detect_dldt.o: obj_detect_dldt.cc test_video.hpp video_encoder.hpp utils.hpp
 	mkdir -p $(BIN)
-	g++ -c $(CXXFLAGS) -fexceptions -I/usr/local/include/dldt $< -o $@
+	g++ -c $(CXXFLAGS) -fexceptions -I/usr/local/include/openvino $< -o $@
 
 $(BIN)/obj_detect_dldt: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_dldt.o
 	mkdir -p $(BIN)
@@ -222,9 +213,7 @@ $(BIN)/mnist.o: $(SRC)/mnist.cc $(SRC)/simple_network.hpp
 
 $(BIN)/mnist: $(BIN)/mnist.o $(BIN)/simple_network.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -Wl,--allow-multiple-definition -Wl,--whole-archive -ltensorflow-core \
-	    -Wl,--no-whole-archive -lprotobuf -lnsync -ldouble-conversion \
-        $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	g++ -o $@ $^ -ltensorflow_cc $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(TESTDATA)/mobilenet_v1_%.tflite: $(PROJECT_ROOT)/models/mobilenet/v1/mobilenet_v1_%.tgz
 	cd $(TESTDATA) ; tar xf $< ./mobilenet_v1_$*.tflite ; touch $@

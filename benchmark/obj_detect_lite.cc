@@ -404,7 +404,6 @@ int main(int argc, char** argv) {
 
 /*
 1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
-w/ 159M memory usage
-ssdlite_mobilenet_v2_coco10_lite/beach.mkv: 290 300x300 frames processed in 7843 ms(27 mspf).
-ssdlite_mobilenet_v2_mixed_lite/beach.mkv: 290 300x300 frames processed in 7845 ms(27 mspf).
+ssdlite_mobilenet_v2_coco10_lite/beach.mkv: 290 300x300 frames processed in 7859 ms(27 mspf).
+ssdlite_mobilenet_v2_mixed_lite/beach.mkv: 290 300x300 frames processed in 8135 ms(28 mspf).
 */

@@ -1,0 +1,806 @@
+diff --git a/tensorflow/BUILD b/tensorflow/BUILD
+index 55406a56..a8d85789 100644
+--- a/tensorflow/BUILD
++++ b/tensorflow/BUILD
+@@ -731,12 +731,11 @@ tf_cc_shared_object(
+     deps = [
+         "//tensorflow:tf_exported_symbols.lds",
+         "//tensorflow:tf_version_script.lds",
+-        "//tensorflow/c:c_api",
+-        "//tensorflow/c/eager:c_api",
+         "//tensorflow/cc:cc_ops",
+         "//tensorflow/cc:client_session",
++        "//tensorflow/cc:grad_ops",
++        "//tensorflow/cc:gradients",
+         "//tensorflow/cc:scope",
+-        "//tensorflow/cc/profiler",
+         "//tensorflow/core:tensorflow",
+     ] + if_ngraph(["@ngraph_tf//:ngraph_tf"]),
+ )
+diff --git a/tensorflow/cc/BUILD b/tensorflow/cc/BUILD
+index 5251ccdf..043ce4bd 100644
+--- a/tensorflow/cc/BUILD
++++ b/tensorflow/cc/BUILD
+@@ -72,6 +72,7 @@ cc_library(
+         "//tensorflow/core:lib",
+         "//tensorflow/core:lib_internal",
+     ],
++    alwayslink = 1,
+ )
+ 
+ tf_cc_test(
+@@ -246,6 +247,7 @@ cc_library_with_android_deps(
+         "//tensorflow/core:lib_experimental",
+         "//tensorflow/core:protos_all_cc",
+     ],
++    alwayslink = 1,
+ )
+ 
+ tf_cc_test(
+@@ -522,26 +524,14 @@ tf_gen_op_wrappers_cc(
+         ":math_ops_internal",
+     ],
+     op_lib_names = [
+-        "audio_ops",
+-        "candidate_sampling_ops",
+         "control_flow_ops",
+         "data_flow_ops",
+         "image_ops",
+-        "io_ops",
+-        "linalg_ops",
+-        "list_ops",
+         "logging_ops",
+-        "lookup_ops",
+-        "manip_ops",
+         "nn_ops",
+-        "no_op",
+-        "parsing_ops",
+         "random_ops",
+-        "sparse_ops",
+         "state_ops",
+-        "string_ops",
+         "training_ops",
+-        "user_ops",
+     ],
+     other_hdrs = [
+         "ops/array_ops.h",
+diff --git a/tensorflow/cc/gradients/math_grad.cc b/tensorflow/cc/gradients/math_grad.cc
+index f67c6f91..7a7c3398 100644
+--- a/tensorflow/cc/gradients/math_grad.cc
++++ b/tensorflow/cc/gradients/math_grad.cc
+@@ -264,6 +264,16 @@ Status SigmoidGrad(const Scope& scope, const Operation& op,
+ }
+ REGISTER_GRADIENT_OP("Sigmoid", SigmoidGrad);
+ 
++Status SigmoidWithCrossEntropyLossGrad(const Scope& scope,
++                                       const Operation& op,
++                                       const std::vector<Output>& grad_inputs,
++                                       std::vector<Output>* grad_outputs) {
++  grad_outputs->push_back(SimpleLossGrad(scope, op.output(1), op.input(1)));
++  grad_outputs->push_back(Identity(scope, grad_inputs[0]));
++  return scope.status();
++}
++REGISTER_GRADIENT_OP("SigmoidWithCrossEntropyLoss", SigmoidWithCrossEntropyLossGrad);
++
+ Status SignGrad(const Scope& scope, const Operation& op,
+                 const std::vector<Output>& grad_inputs,
+                 std::vector<Output>* grad_outputs) {
+diff --git a/tensorflow/cc/gradients/nn_grad.cc b/tensorflow/cc/gradients/nn_grad.cc
+index d329b999..d0c42ed2 100644
+--- a/tensorflow/cc/gradients/nn_grad.cc
++++ b/tensorflow/cc/gradients/nn_grad.cc
+@@ -125,6 +125,16 @@ Status LogSoftmaxGrad(const Scope& scope, const Operation& op,
+ }
+ REGISTER_GRADIENT_OP("LogSoftmax", LogSoftmaxGrad);
+ 
++Status SoftmaxWithLogLikelihoodLossGrad(const Scope& scope,
++                                        const Operation& op,
++                                        const std::vector<Output>& grad_inputs,
++                                        std::vector<Output>* grad_outputs) {
++  grad_outputs->push_back(SimpleLossGrad(scope, op.output(1), op.input(1)));
++  grad_outputs->push_back(Identity(scope, grad_inputs[0]));
++  return scope.status();
++}
++REGISTER_GRADIENT_OP("SoftmaxWithLogLikelihoodLoss", SoftmaxWithLogLikelihoodLossGrad);
++
+ Status ReluGradHelper(const Scope& scope, const Operation& op,
+                       const std::vector<Output>& grad_inputs,
+                       std::vector<Output>* grad_outputs) {
+diff --git a/tensorflow/cc/ops/standard_ops.h b/tensorflow/cc/ops/standard_ops.h
+index 98f53010..2f37e68a 100644
+--- a/tensorflow/cc/ops/standard_ops.h
++++ b/tensorflow/cc/ops/standard_ops.h
+@@ -17,24 +17,15 @@ limitations under the License.
+ #define TENSORFLOW_CC_OPS_STANDARD_OPS_H_
+ 
+ #include "tensorflow/cc/ops/array_ops.h"
+-#include "tensorflow/cc/ops/candidate_sampling_ops.h"
+ #include "tensorflow/cc/ops/const_op.h"
+ #include "tensorflow/cc/ops/control_flow_ops.h"
+ #include "tensorflow/cc/ops/data_flow_ops.h"
+ #include "tensorflow/cc/ops/image_ops.h"
+-#include "tensorflow/cc/ops/io_ops.h"
+-#include "tensorflow/cc/ops/linalg_ops.h"
+ #include "tensorflow/cc/ops/logging_ops.h"
+-#include "tensorflow/cc/ops/lookup_ops.h"
+ #include "tensorflow/cc/ops/math_ops.h"
+ #include "tensorflow/cc/ops/nn_ops.h"
+-#include "tensorflow/cc/ops/no_op.h"
+-#include "tensorflow/cc/ops/parsing_ops.h"
+ #include "tensorflow/cc/ops/random_ops.h"
+-#include "tensorflow/cc/ops/sparse_ops.h"
+ #include "tensorflow/cc/ops/state_ops.h"
+-#include "tensorflow/cc/ops/string_ops.h"
+ #include "tensorflow/cc/ops/training_ops.h"
+-#include "tensorflow/cc/ops/user_ops.h"
+ 
+ #endif  // TENSORFLOW_CC_OPS_STANDARD_OPS_H_
+diff --git a/tensorflow/core/BUILD b/tensorflow/core/BUILD
+index b02eb89e..d4f8c05f 100644
+--- a/tensorflow/core/BUILD
++++ b/tensorflow/core/BUILD
+@@ -835,73 +835,19 @@ cc_library(
+     visibility = ["//visibility:public"],
+     deps = [
+         ":array_ops_op_lib",
+-        ":audio_ops_op_lib",
+-        ":batch_ops_op_lib",
+         ":bitwise_ops_op_lib",
+-        ":boosted_trees_ops_op_lib",
+-        ":tensor_forest_ops_op_lib",
+-        ":candidate_sampling_ops_op_lib",
+-        ":checkpoint_ops_op_lib",
+-        ":clustering_ops_op_lib",
+-        ":collective_ops_op_lib",
+         ":control_flow_ops_op_lib",
+-        ":ctc_ops_op_lib",
+-        ":cudnn_rnn_ops_op_lib",
+         ":data_flow_ops_op_lib",
+         ":dataset_ops_op_lib",
+-        ":debug_ops_op_lib",
+-        ":decode_proto_ops_op_lib",
+-        ":encode_proto_ops_op_lib",
+-        ":experimental_dataset_ops_op_lib",
+-        ":function_ops_op_lib",
+-        ":functional_ops_op_lib",
+         ":image_ops_op_lib",
+-        ":io_ops_op_lib",
+-        ":linalg_ops_op_lib",
+-        ":list_ops_op_lib",
+         ":logging_ops_op_lib",
+-        ":lookup_ops_op_lib",
+-        ":manip_ops_op_lib",
+         ":math_ops_op_lib",
+-        ":nccl_ops_op_lib",
+         ":nn_ops_op_lib",
+         ":no_op_op_lib",
+-        ":parsing_ops_op_lib",
+-        ":ragged_ops",
+         ":random_ops_op_lib",
+-        ":rnn_ops_op_lib",
+-        ":special_math_ops_op_lib",
+-        ":stateful_random_ops_op_lib",
+-        ":remote_fused_graph_ops_op_lib",
+-        ":resource_variable_ops_op_lib",
+-        ":rpc_ops_op_lib",
+-        ":scoped_allocator_ops_op_lib",
+-        ":script_ops_op_lib",
+-        ":sdca_ops_op_lib",
+         ":sendrecv_ops_op_lib",
+-        ":set_ops_op_lib",
+-        ":sparse_csr_matrix_ops_op_lib",
+-        ":sparse_ops_op_lib",
+-        ":summary_ops_op_lib",
+-        ":spectral_ops_op_lib",
+         ":state_ops_op_lib",
+-        ":stateless_random_ops_op_lib",
+-        ":string_ops_op_lib",
+-        ":tpu_configuration_ops_op_lib",
+-        ":tpu_cross_replica_ops_op_lib",
+-        ":tpu_embedding_ops_op_lib",
+-        ":tpu_functional_ops_op_lib",
+-        ":tpu_heartbeat_ops_op_lib",
+-        ":tpu_host_compute_ops_op_lib",
+-        ":tpu_infeed_ops_op_lib",
+-        ":tpu_outfeed_ops_op_lib",
+-        ":tpu_ordinal_selector_ops_op_lib",
+-        ":tpu_replication_ops_op_lib",
+         ":training_ops_op_lib",
+-        ":user_ops_op_lib",
+-        ":word2vec_ops",
+-        "//tensorflow/c/kernels:bitcast_op_lib",
+-        "//tensorflow/compiler/mlir/tensorflow:mlir_passthrough_op",
+     ] + if_mkl([
+         ":mkl_array_ops_op_lib",
+         ":mkl_nn_ops_op_lib",
+@@ -1135,14 +1081,42 @@ tf_cuda_library(
+     copts = tf_copts(),
+     visibility = ["//visibility:public"],
+     deps = [
+-        ":all_kernels",
+-        ":core",
++        "//tensorflow/core/kernels:array",
++        "//tensorflow/core/kernels:constant_op",
++        "//tensorflow/core/kernels:control_flow_ops",
++        "//tensorflow/core/kernels:data_flow",
++        "//tensorflow/core/kernels:fake_quant_ops",
++        "//tensorflow/core/kernels:image",
++        "//tensorflow/core/kernels:logging",
++        "//tensorflow/core/kernels:math",
++        "//tensorflow/core/kernels:nn",
++        "//tensorflow/core/kernels:pooling_ops",
++        "//tensorflow/core/kernels:random_ops",
++        "//tensorflow/core/kernels:state",
++        "//tensorflow/core/kernels:training_ops",
++        ":core_cpu",
+         ":direct_session",
+-        ":example_parser_configuration",
+-        ":gpu_runtime",
+         ":lib",
+         ":ops",
+-    ] + tensorflow_opensource_extra_deps(),
++    ] + tensorflow_opensource_extra_deps() +
++    if_mkl([
++        "//tensorflow/core/kernels:mkl_concat_op",
++        "//tensorflow/core/kernels:mkl_conv_op",
++        "//tensorflow/core/kernels:mkl_cwise_ops_common",
++        "//tensorflow/core/kernels:mkl_fused_batch_norm_op",
++        "//tensorflow/core/kernels:mkl_identity_op",
++        "//tensorflow/core/kernels:mkl_input_conversion_op",
++        "//tensorflow/core/kernels:mkl_pooling_ops",
++        "//tensorflow/core/kernels:mkl_qmatmul_op",
++        "//tensorflow/core/kernels:mkl_relu_op",
++        "//tensorflow/core/kernels:mkl_reshape_op",
++        "//tensorflow/core/kernels:mkl_slice_op",
++        "//tensorflow/core/kernels:mkl_softmax_op",
++        "//tensorflow/core/kernels:mkl_transpose_op",
++        "//tensorflow/core/kernels:mkl_batch_matmul_op",
++        "//tensorflow/core/kernels:mkl_matmul_op",
++        "//tensorflow/core/kernels:mkl_tfconv_op",
++    ]) + mkl_deps(),
+ )
+ 
+ cc_library(
+@@ -2375,7 +2349,7 @@ tf_cuda_library(
+     ] + if_static(
+         extra_deps = ["@com_google_protobuf//:protobuf"],
+         otherwise = ["@com_google_protobuf//:protobuf_headers"],
+-    ) + mkl_deps(),
++    ),
+     alwayslink = 1,
+ )
+ 
+@@ -2482,7 +2456,6 @@ tf_cuda_library(
+         ":functional_grad",
+         ":functional_ops_op_lib",
+         "//tensorflow/core/kernels:bounds_check",
+-        "//tensorflow/core/kernels:required",
+     ]),
+     alwayslink = 1,
+ )
+@@ -2670,9 +2643,6 @@ tf_cuda_library(
+         "//third_party/eigen3",
+         "//tensorflow/core/public:version",
+         "//tensorflow/core/grappler/utils:functions",
+-        "//tensorflow/core/profiler/lib:annotated_traceme",
+-        "//tensorflow/core/profiler/lib:scoped_annotation",
+-        "//tensorflow/core/profiler/lib:traceme",
+     ] + mkl_deps(),
+     alwayslink = 1,
+ )
+@@ -2719,9 +2689,6 @@ tf_cuda_library(
+         "//third_party/eigen3",
+     ] + mkl_deps() + tf_additional_core_deps() + if_static([
+         ":core_cpu_impl",
+-        ":function_ops_op_lib",
+-        ":functional_grad",
+-        ":functional_ops_op_lib",
+         "//tensorflow/core/kernels:required",
+     ]),
+     alwayslink = 1,
+diff --git a/tensorflow/core/graph/mkl_layout_pass.cc b/tensorflow/core/graph/mkl_layout_pass.cc
+index c27c7aa9..fcd2de3d 100644
+--- a/tensorflow/core/graph/mkl_layout_pass.cc
++++ b/tensorflow/core/graph/mkl_layout_pass.cc
+@@ -367,9 +367,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+     rinfo_.push_back({csinfo_.addn, mkl_op_registry::GetMklOpName(csinfo_.addn),
+                       CopyAttrsAll, AlwaysRewrite,
+                       kRewriteForLayoutPropagation});
+-    rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
++    /*rinfo_.push_back({csinfo_.add, mkl_op_registry::GetMklOpName(csinfo_.add),
+                       CopyAttrsAll, RewriteIfAtleastOneMklInput,
+-                      kRewriteForLayoutPropagation});
++                      kRewriteForLayoutPropagation});*/
+     rinfo_.push_back({csinfo_.add_v2,
+                       mkl_op_registry::GetMklOpName(csinfo_.add_v2),
+                       CopyAttrsAll, RewriteIfAtleastOneMklInput,
+@@ -521,9 +521,9 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+                       mkl_op_registry::GetMklOpName(csinfo_.maximum),
+                       CopyAttrsAll, RewriteIfAtleastOneMklInput,
+                       kRewriteForLayoutPropagation});
+-    rinfo_.push_back({csinfo_.mul, mkl_op_registry::GetMklOpName(csinfo_.mul),
++    /*rinfo_.push_back({csinfo_.mul, mkl_op_registry::GetMklOpName(csinfo_.mul),
+                       CopyAttrsAll, RewriteIfAtleastOneMklInput,
+-                      kRewriteForLayoutPropagation});
++                      kRewriteForLayoutPropagation});*/
+     rinfo_.push_back({csinfo_.pad_with_conv2d, csinfo_.mkl_pad_with_conv2d,
+                       CopyAttrsPadWithConv2D, AlwaysRewrite,
+                       kRewriteForLayoutPropagation});
+@@ -680,7 +680,6 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+                       mkl_op_registry::GetMklOpName(csinfo_.tanh_grad),
+                       CopyAttrsAll, AlwaysRewrite,
+                       kRewriteForLayoutPropagation});
+-    */
+     rinfo_.push_back(
+         {csinfo_.reshape, mkl_op_registry::GetMklOpName(csinfo_.reshape),
+          CopyAttrsAll, AlwaysRewrite, kRewriteForLayoutPropagation});
+@@ -688,6 +687,7 @@ class MklLayoutRewritePass : public GraphOptimizationPass {
+                       mkl_op_registry::GetMklOpName(csinfo_.slice),
+                       CopyAttrsAll, RewriteIfAtleastOneMklInput,
+                       kRewriteForLayoutPropagation});
++    */
+     rinfo_.push_back(
+         {csinfo_.softmax, mkl_op_registry::GetMklOpName(csinfo_.softmax),
+          CopyAttrsAll, AlwaysRewrite, kRewriteForLayoutPropagation});
+diff --git a/tensorflow/core/kernels/BUILD b/tensorflow/core/kernels/BUILD
+index c812b0f4..49508de4 100644
+--- a/tensorflow/core/kernels/BUILD
++++ b/tensorflow/core/kernels/BUILD
+@@ -2429,8 +2429,6 @@ cc_library(
+         ":dynamic_partition_op",
+         ":dynamic_stitch_op",
+         ":fifo_queue_op",
+-        ":lookup_table_init_op",
+-        ":lookup_table_op",
+         ":map_stage_op",
+         ":padding_fifo_queue_op",
+         ":priority_queue_op",
+@@ -3945,16 +3943,12 @@ cc_library(
+         ":compare_and_bitpack_op",
+         ":cross_op",
+         ":cwise_op",
+-        ":fft_ops",
+-        ":histogram_op",
+         ":matmul_op",
+         ":nextafter_op",
+-        ":population_count_op",
+         ":reduction_ops",
+         ":scan_ops",
+         ":segment_reduction_ops",
+         ":sequence_ops",
+-        "//tensorflow/core/kernels/special_math:special_math_op",
+     ],
+ )
+ 
+@@ -4730,7 +4724,10 @@ tf_kernel_library(
+ tf_kernel_library(
+     name = "softmax_op",
+     prefix = "softmax_op",
+-    deps = NN_DEPS + if_cuda_or_rocm([
++    deps = NN_DEPS + [
++        ":cwise_lib_hdrs",
++    ] +
++    if_cuda_or_rocm([
+         ":reduction_ops",
+     ]) + if_cuda([
+         "@cub_archive//:cub",
+diff --git a/tensorflow/core/kernels/cwise_op_sigmoid.cc b/tensorflow/core/kernels/cwise_op_sigmoid.cc
+index 92628457..2f518fd9 100644
+--- a/tensorflow/core/kernels/cwise_op_sigmoid.cc
++++ b/tensorflow/core/kernels/cwise_op_sigmoid.cc
+@@ -13,6 +13,9 @@ See the License for the specific language governing permissions and
+ limitations under the License.
+ ==============================================================================*/
+ 
++#define EIGEN_USE_THREADS
++
++#include "tensorflow/core/framework/register_types.h"
+ #include "tensorflow/core/kernels/cwise_ops_common.h"
+ #include "tensorflow/core/kernels/cwise_ops_gradients.h"
+ 
+@@ -37,4 +40,51 @@ REGISTER3(SimpleBinaryOp, GPU, "SigmoidGrad", functor::sigmoid_grad, float,
+ REGISTER(SimpleBinaryOp, SYCL, "SigmoidGrad", functor::sigmoid_grad, float);
+ #endif  // TENSORFLOW_USE_SYCL
+ 
++template <typename Device, typename T>
++class SigmoidWithCrossEntropyLossOp : public OpKernel {
++ public:
++  explicit SigmoidWithCrossEntropyLossOp(OpKernelConstruction* context)
++      : OpKernel(context) {}
++
++  void Compute(OpKernelContext* context) override {
++    const Tensor& logits_in = context->input(0);
++    const TensorShape shape_in = logits_in.shape();
++    OP_REQUIRES(context, TensorShapeUtils::IsMatrix(shape_in),
++                errors::InvalidArgument("logits must be 2-dimensional"));
++    Tensor* loss_out = nullptr;
++    OP_REQUIRES_OK(context, context->allocate_output(
++            0, TensorShape({shape_in.dim_size(0)}), &loss_out));
++    Tensor* sigmoid_out = nullptr;
++    OP_REQUIRES_OK(context, context->forward_input_or_allocate_output(
++            {0}, 1, shape_in, &sigmoid_out));
++    if (logits_in.NumElements() > 0) {
++      functor::UnaryFunctor<Device, functor::sigmoid<T>> sigmoid_functor;
++      sigmoid_functor(context->eigen_device<Device>(), sigmoid_out->flat<T>(),
++                      logits_in.flat<T>());
++      const auto sigmoid = sigmoid_out->matrix<T>();
++      const auto labels = context->input(1).flat<int>();
++      auto loss = loss_out->vec<T>();
++      for (int i = 0; i < sigmoid_out->dim_size(0); i++) {
++        float xent = 0.f;
++        for (int j = 0; j < sigmoid_out->dim_size(1); j++) {
++          if (j == labels(i)) {
++            xent -= ::logf(sigmoid(i, j));
++          } else {
++            xent -= ::logf(1 - sigmoid(i, j));
++          }
++        }
++        loss(i) == xent;
++      }
++    }
++  }
++};
++
++#undef REGISTER_CPU
++#define REGISTER_CPU(T)                                          \
++  REGISTER_KERNEL_BUILDER(                                       \
++      Name("SigmoidWithCrossEntropyLoss").Device(DEVICE_CPU).TypeConstraint<T>("T"), \
++      SigmoidWithCrossEntropyLossOp<CPUDevice, T>);
++TF_CALL_float(REGISTER_CPU);
++TF_CALL_double(REGISTER_CPU);
++
+ }  // namespace tensorflow
+diff --git a/tensorflow/core/kernels/softmax_op.cc b/tensorflow/core/kernels/softmax_op.cc
+index 54c0e9f9..81faec7d 100644
+--- a/tensorflow/core/kernels/softmax_op.cc
++++ b/tensorflow/core/kernels/softmax_op.cc
+@@ -15,6 +15,8 @@ limitations under the License.
+ 
+ // See docs in ../ops/nn_ops.cc.
+ 
++#include <math.h>
++
+ #include "tensorflow/core/lib/strings/str_util.h"
+ #define EIGEN_USE_THREADS
+ 
+@@ -23,6 +25,7 @@ limitations under the License.
+ #include "tensorflow/core/framework/register_types.h"
+ #include "tensorflow/core/framework/tensor.h"
+ #include "tensorflow/core/framework/tensor_shape.h"
++#include "tensorflow/core/kernels/cwise_ops.h"
+ #include "tensorflow/core/kernels/softmax_op_functor.h"
+ 
+ namespace tensorflow {
+@@ -103,4 +106,84 @@ REGISTER_KERNEL_BUILDER(
+     Name("Softmax").Device(DEVICE_SYCL).TypeConstraint<double>("T"),
+     SoftmaxOp<SYCLDevice, double>);
+ #endif  // TENSORFLOW_USE_SYCL
++
++template <typename Device, typename T>
++class SimpleLossGradOp : public OpKernel {
++ public:
++  explicit SimpleLossGradOp(OpKernelConstruction* context) : OpKernel(context) {}
++
++  void Compute(OpKernelContext* context) override {
++    const Tensor& output_in = context->input(0);
++    const TensorShape shape_in = output_in.shape();
++    OP_REQUIRES(context, TensorShapeUtils::IsMatrix(shape_in),
++                errors::InvalidArgument("output must be 2-dimensional"));
++    Tensor* grad_out = nullptr;
++    OP_REQUIRES_OK(context, context->forward_input_or_allocate_output(
++            {0}, 0, shape_in, &grad_out));
++    if (output_in.NumElements() > 0) {
++      const auto output = output_in.matrix<T>();
++      const auto labels = context->input(1).flat<int>();
++      auto grad = grad_out->matrix<T>();
++      for (int r = 0; r < output_in.dim_size(0); r++) {
++          for (int c = 0; c < output_in.dim_size(1); c++) {
++              if (labels(r) == c) {
++                  grad(r, c) = output(r, c) - 1.f;
++              } else {
++                  grad(r, c) = output(r, c);
++              }
++          }
++      }
++    }
++  }
++};
++
++#undef REGISTER_CPU
++#define REGISTER_CPU(T)                                          \
++  REGISTER_KERNEL_BUILDER(                                       \
++      Name("SimpleLossGrad").Device(DEVICE_CPU).TypeConstraint<T>("T"), \
++      SimpleLossGradOp<CPUDevice, T>);
++TF_CALL_float(REGISTER_CPU);
++TF_CALL_double(REGISTER_CPU);
++#undef REGISTER_CPU
++
++template <typename Device, typename T>
++class SoftmaxWithLogLikelihoodLossOp : public OpKernel {
++ public:
++  explicit SoftmaxWithLogLikelihoodLossOp(OpKernelConstruction* context)
++      : OpKernel(context) {}
++
++  void Compute(OpKernelContext* context) override {
++    const Tensor& logits_in = context->input(0);
++    const TensorShape shape_in = logits_in.shape();
++    OP_REQUIRES(context, TensorShapeUtils::IsMatrix(shape_in),
++                errors::InvalidArgument("logits must be 2-dimensional"));
++    Tensor* loss_out = nullptr;
++    OP_REQUIRES_OK(context, context->allocate_output(
++            0, TensorShape({shape_in.dim_size(0)}), &loss_out));
++    Tensor* softmax_out = nullptr;
++    OP_REQUIRES_OK(context, context->forward_input_or_allocate_output(
++            {0}, 1, shape_in, &softmax_out));
++    if (logits_in.NumElements() > 0) {
++      functor::SoftmaxFunctor<Device, T> softmax_functor;
++      auto softmax = softmax_out->matrix<T>();
++      softmax_functor(context->eigen_device<Device>(), logits_in.matrix<T>(),
++                      softmax, false);
++      const auto labels = context->input(1).flat<int>();
++      auto loss = loss_out->vec<T>();
++      typename functor::log<T>::func log_functor;
++      for (int i = 0; i < loss.size(); i++) {
++          loss(i) = -log_functor(softmax(i, labels(i)));
++      }
++    }
++  }
++};
++
++#undef REGISTER_CPU
++#define REGISTER_CPU(T)                                          \
++  REGISTER_KERNEL_BUILDER(                                       \
++      Name("SoftmaxWithLogLikelihoodLoss").Device(DEVICE_CPU).TypeConstraint<T>("T"), \
++      SoftmaxWithLogLikelihoodLossOp<CPUDevice, T>);
++TF_CALL_float(REGISTER_CPU);
++TF_CALL_double(REGISTER_CPU);
++
+ }  // namespace tensorflow
+diff --git a/tensorflow/core/ops/math_ops.cc b/tensorflow/core/ops/math_ops.cc
+index 7ba946fa..d6baf9c2 100644
+--- a/tensorflow/core/ops/math_ops.cc
++++ b/tensorflow/core/ops/math_ops.cc
+@@ -320,6 +320,28 @@ expected to create these operators.
+ #undef UNARY_REAL
+ #undef UNARY_COMPLEX
+ 
++REGISTER_OP("SigmoidWithCrossEntropyLoss")
++    .Input("logits: T")
++    .Input("labels: int32")
++    .Output("loss: T")
++    .Output("sigmoid: T")
++    .Attr("T: {float, double}")
++    .SetShapeFn([](InferenceContext* c) {
++      ShapeHandle logits;
++      ShapeHandle labels;
++      if (c->WithRank(c->input(0), 2, &logits) == Status::OK() &&
++          c->WithRank(c->input(1), 1, &labels) == Status::OK()) {
++        DimensionHandle batch_size = c->Dim(logits, 0);
++        if (c->Value(batch_size) != c->Value(c->Dim(labels, 0))) {
++            return errors::InvalidArgument("Expect labels of batch size");
++        }
++        c->set_output(0, labels);
++        c->set_output(1, logits);
++        return Status::OK();
++      }
++      return errors::InvalidArgument("Expect logits of rank 2 and labels of rank 1");
++    });
++
+ REGISTER_OP("IsNan")
+     .Input("x: T")
+     .Output("y: bool")
+diff --git a/tensorflow/core/ops/nn_ops.cc b/tensorflow/core/ops/nn_ops.cc
+index 90c3f246..c12081f1 100644
+--- a/tensorflow/core/ops/nn_ops.cc
++++ b/tensorflow/core/ops/nn_ops.cc
+@@ -1169,6 +1169,50 @@ REGISTER_OP("LogSoftmax")
+ 
+ // --------------------------------------------------------------------------
+ 
++REGISTER_OP("SimpleLossGrad")
++    .Input("output: T")
++    .Input("labels: int32")
++    .Output("grad: T")
++    .Attr("T: {float, double}")
++    .SetShapeFn([](InferenceContext* c) {
++      ShapeHandle output;
++      ShapeHandle labels;
++      if (c->WithRank(c->input(0), 2, &output) == Status::OK() &&
++          c->WithRank(c->input(1), 1, &labels) == Status::OK()) {
++        DimensionHandle batch_size = c->Dim(output, 0);
++        if (c->Value(batch_size) != c->Value(c->Dim(labels, 0))) {
++            return errors::InvalidArgument("Expect labels of batch size");
++        }
++        c->set_output(0, output);
++        return Status::OK();
++      }
++      return errors::InvalidArgument("Expect output of rank 2 and labels of rank 1");
++    });
++
++REGISTER_OP("SoftmaxWithLogLikelihoodLoss")
++    .Input("logits: T")
++    .Input("labels: int32")
++    .Output("loss: T")
++    .Output("softmax: T")
++    .Attr("T: {float, double}")
++    .SetShapeFn([](InferenceContext* c) {
++      ShapeHandle logits;
++      ShapeHandle labels;
++      if (c->WithRank(c->input(0), 2, &logits) == Status::OK() &&
++          c->WithRank(c->input(1), 1, &labels) == Status::OK()) {
++        DimensionHandle batch_size = c->Dim(logits, 0);
++        if (c->Value(batch_size) != c->Value(c->Dim(labels, 0))) {
++            return errors::InvalidArgument("Expect labels of batch size");
++        }
++        c->set_output(0, labels);
++        c->set_output(1, logits);
++        return Status::OK();
++      }
++      return errors::InvalidArgument("Expect logits of rank 2 and labels of rank 1");
++    });
++
++// --------------------------------------------------------------------------
++
+ REGISTER_OP("SoftmaxCrossEntropyWithLogits")
+     .Input("features: T")
+     .Input("labels: T")
+diff --git a/tensorflow/lite/tools/make/Makefile b/tensorflow/lite/tools/make/Makefile
+index b78fb14b..b2cf3fcd 100644
+--- a/tensorflow/lite/tools/make/Makefile
++++ b/tensorflow/lite/tools/make/Makefile
+@@ -56,7 +56,7 @@ LIBS := \
+ # There are no rules for compiling objects for the host system (since we don't
+ # generate things like the protobuf compiler that require that), so all of
+ # these settings are for the target compiler.
+-CFLAGS := -O3 -DNDEBUG -fPIC
++CFLAGS := -O3 -DNDEBUG -fPIC {{mopts}}
+ CXXFLAGS := $(CFLAGS) --std=c++11 $(EXTRA_CXXFLAGS)
+ LDOPTS := -L/usr/local/lib
+ ARFLAGS := -r
+diff --git a/tensorflow/tensorflow.bzl b/tensorflow/tensorflow.bzl
+index be5fb907..c9b4e9af 100644
+--- a/tensorflow/tensorflow.bzl
++++ b/tensorflow/tensorflow.bzl
+@@ -319,7 +319,7 @@ def tf_copts(
+         if_enable_mkl(["-DENABLE_MKL"]) +
+         if_ngraph(["-DINTEL_NGRAPH=1"]) +
+         if_android_arm(["-mfpu=neon"]) +
+-        if_linux_x86_64(["-msse3"]) +
++        if_linux_x86_64(["-msse2"]) +
+         if_ios_x86_64(["-msse4.1"]) +
+         select({
+             clean_dep("//tensorflow:framework_shared_object"): [],
+@@ -336,7 +336,7 @@ def tf_copts(
+     )
+ 
+ def tf_openmp_copts():
+-    return if_mkl_lnx_x64(["-fopenmp"])
++    return []
+ 
+ def tfe_xla_copts():
+     return select({
+diff --git a/tensorflow/tools/benchmark/BUILD b/tensorflow/tools/benchmark/BUILD
+index 93b408d5..a5bcb749 100644
+--- a/tensorflow/tools/benchmark/BUILD
++++ b/tensorflow/tools/benchmark/BUILD
+@@ -32,12 +32,9 @@ cc_library(
+             "//tensorflow/core:android_tensorflow_test_lib",
+         ],
+         "//conditions:default": [
+-            "//tensorflow/core:core_cpu",
+-            "//tensorflow/core:lib",
+-            "//tensorflow/core:framework",
+-            "//tensorflow/core:framework_internal",
+-            "//tensorflow/core:framework_lite",
+-            "//tensorflow/core:protos_all_cc",
++            "//tensorflow/cc:cc_ops",
++            "//tensorflow/cc:client_session",
++            "//tensorflow/cc:scope",
+             "//tensorflow/core:tensorflow",
+             "//tensorflow/core:test",
+         ],
+diff --git a/third_party/eigen3/BUILD b/third_party/eigen3/BUILD
+index 595321fd..fdb8240b 100644
+--- a/third_party/eigen3/BUILD
++++ b/third_party/eigen3/BUILD
+@@ -34,6 +34,9 @@ cc_library(
+     name = "eigen3",
+     hdrs = EIGEN3_THIRD_PARTY_HEADERS,
+     includes = if_mkl(["./mkl_include"]),
++    defines = [
++        "EIGEN_DONT_PARALLELIZE",
++    ],
+     visibility = ["//visibility:public"],
+     deps = [
+         "@eigen_archive//:eigen",
+diff --git a/third_party/mkl/mkl.BUILD b/third_party/mkl/mkl.BUILD
+index 72370182..5339b776 100644
+--- a/third_party/mkl/mkl.BUILD
++++ b/third_party/mkl/mkl.BUILD
+@@ -19,9 +19,13 @@ cc_library(
+ 
+ cc_library(
+     name = "mkl_libs_linux",
+-    srcs = [
+-        "lib/libiomp5.so",
+-        "lib/libmklml_intel.so",
++    linkopts = [
++        "-L/usr/local/intel/mkl/lib",
++        "-Wl,--start-group",
++        "-lmkl_intel_lp64",
++        "-lmkl_sequential",
++        "-lmkl_core",
++        "-Wl,--end-group",
+     ],
+     visibility = ["//visibility:public"],
+ )
+diff --git a/third_party/mkl_dnn/mkldnn_v1.BUILD b/third_party/mkl_dnn/mkldnn_v1.BUILD
+index b916738c..403f6607 100644
+--- a/third_party/mkl_dnn/mkldnn_v1.BUILD
++++ b/third_party/mkl_dnn/mkldnn_v1.BUILD
+@@ -23,8 +23,8 @@ template_rule(
+     src = "include/dnnl_config.h.in",
+     out = "include/dnnl_config.h",
+     substitutions = {
+-        "#cmakedefine DNNL_CPU_THREADING_RUNTIME DNNL_RUNTIME_${DNNL_CPU_THREADING_RUNTIME}": "#define DNNL_CPU_THREADING_RUNTIME DNNL_RUNTIME_OMP",
+-        "#cmakedefine DNNL_CPU_RUNTIME DNNL_RUNTIME_${DNNL_CPU_RUNTIME}": "#define DNNL_CPU_RUNTIME DNNL_RUNTIME_OMP",
++        "#cmakedefine DNNL_CPU_THREADING_RUNTIME DNNL_RUNTIME_${DNNL_CPU_THREADING_RUNTIME}": "#define DNNL_CPU_THREADING_RUNTIME DNNL_RUNTIME_SEQ",
++        "#cmakedefine DNNL_CPU_RUNTIME DNNL_RUNTIME_${DNNL_CPU_RUNTIME}": "#define DNNL_CPU_RUNTIME DNNL_RUNTIME_SEQ",
+         "#cmakedefine DNNL_GPU_RUNTIME DNNL_RUNTIME_${DNNL_GPU_RUNTIME}": "#define DNNL_GPU_RUNTIME DNNL_RUNTIME_NONE",
+     },
+ )
+@@ -67,21 +67,14 @@ cc_library(
+         "-fexceptions",
+         "-DUSE_MKL",
+         "-DUSE_CBLAS",
++        "-DMKLDNN_THR=MKLDNN_THR_SEQ",  # Disables threading.
+     ] + if_mkl_open_source_only([
+         "-UUSE_MKL",
+         "-UUSE_CBLAS",
+     ]) + if_mkl_v1_open_source_only([
+         "-UUSE_MKL",
+         "-UUSE_CBLAS",
+-    ]) + select({
+-        "@org_tensorflow//tensorflow:linux_x86_64": [
+-            "-fopenmp",  # only works with gcc
+-        ],
+-        # TODO(ibiryukov): enable openmp with clang by including libomp as a
+-        # dependency.
+-        ":clang_linux_x86_64": [],
+-        "//conditions:default": [],
+-    }),
++    ]),
+     includes = [
+         "include",
+         "src",
+@@ -107,30 +100,3 @@ cc_library(
+         "//conditions:default": [],
+     }),
+ )
+-
+-cc_library(
+-    name = "mkldnn_single_threaded",
+-    srcs = glob([
+-        "src/common/*.cpp",
+-        "src/common/*.hpp",
+-        "src/cpu/*.cpp",
+-        "src/cpu/*.hpp",
+-        "src/cpu/**/*.cpp",
+-        "src/cpu/**/*.hpp",
+-        "src/cpu/xbyak/*.h",
+-    ]) + [":dnnl_config_h"],
+-    hdrs = glob(["include/*"]),
+-    copts = [
+-        "-fexceptions",
+-        "-DMKLDNN_THR=MKLDNN_THR_SEQ",  # Disables threading.
+-    ],
+-    includes = [
+-        "include",
+-        "src",
+-        "src/common",
+-        "src/cpu",
+-        "src/cpu/gemm",
+-        "src/cpu/xbyak",
+-    ],
+-    visibility = ["//visibility:public"],
+-)

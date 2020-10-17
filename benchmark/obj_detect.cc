@@ -439,9 +439,8 @@ int main(int argc, char** argv) {
 
 /*
 1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
-w/ 558M memory usage
-ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 300x300 frames processed in 25824 ms(89 mspf).
-ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 300x300 frames processed in 24356 ms(83 mspf).
-ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 300x300 frames processed in 17939 ms(61 mspf).
-ssdlite_mobilenet_v2_mixed/beach.mkv: 290 300x300 frames processed in 13457 ms(46 mspf).
+ssd_mobilenet_v1_coco_2017_11_17/beach.mkv: 290 300x300 frames processed in 26138 ms(90 mspf).
+ssd_mobilenet_v2_coco_2018_03_29/beach.mkv: 290 300x300 frames processed in 23810 ms(82 mspf).
+ssdlite_mobilenet_v2_coco_2018_05_09/beach.mkv: 290 300x300 frames processed in 16252 ms(56 mspf).
+ssdlite_mobilenet_v2_mixed/beach.mkv: 290 300x300 frames processed in 13609 ms(46 mspf).
 */

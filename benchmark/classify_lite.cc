@@ -7,8 +7,8 @@
 #include <benchmark/benchmark.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <tensorflow/contrib/lite/kernels/register.h>
-#include <tensorflow/contrib/lite/model.h>
+#include <tensorflow/lite/kernels/register.h>
+#include <tensorflow/lite/model.h>
 
 #include "test_video.hpp"
 

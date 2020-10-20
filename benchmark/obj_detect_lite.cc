@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include <edgetpu.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <opencv2/core.hpp>
@@ -23,6 +24,8 @@
 #include "test_video.hpp"
 #include "video_encoder.hpp"
 
+DEFINE_bool(use_edgetpu, false, "");
+DEFINE_string(edgetpu_path, "", "");
 DEFINE_string(model_file, "", "");
 DEFINE_bool(is_quantized_model, false, "");
 DEFINE_string(labels_file, "", "");
@@ -107,9 +110,40 @@ struct AVFrameAndMat {
     cv::Mat* mat;
 };
 
+const char* EdgeTpuDeviceTypeStr(edgetpu::DeviceType type) {
+    switch (type) {
+        case edgetpu::DeviceType::kApexPci:
+            return "pci";
+        case edgetpu::DeviceType::kApexUsb:
+            return "usb";
+    }
+    return nullptr;
+}
+
 class ObjDetector {
   public:
-    ObjDetector() {};
+    ObjDetector() {
+        if (FLAGS_use_edgetpu) {
+            auto* edgetpu_mgr = edgetpu::EdgeTpuManager::GetSingleton();
+            for (const auto& record : edgetpu_mgr->EnumerateEdgeTpu()) {
+                LOG(INFO) << "Found edgetpu " << EdgeTpuDeviceTypeStr(record.type) << ":"
+                          << record.path;
+                if (record.path == FLAGS_edgetpu_path) {
+                    edgetpu_ctx_ = edgetpu_mgr->OpenDevice(record.type, record.path);
+                }
+            }
+            if (!edgetpu_ctx_ && FLAGS_edgetpu_path.empty()) {
+                edgetpu_ctx_ = edgetpu_mgr->OpenDevice();
+            }
+            if (edgetpu_ctx_) {
+                const auto& record = edgetpu_ctx_->GetDeviceEnumRecord();
+                LOG(INFO) << "Will use edgetpu " << EdgeTpuDeviceTypeStr(record.type) << ":"
+                          << record.path;
+            } else {
+                LOG(FATAL) << "Failed to open edgetpu device!";
+            }
+        }
+    };
 
     bool Init(const std::string& model_file, bool is_quantized,
               const std::vector<std::string>& labels) {
@@ -122,11 +156,18 @@ class ObjDetector {
 
         // Create interpreter.
         tflite::ops::builtin::BuiltinOpResolver resolver;
+        if (edgetpu_ctx_) {
+            resolver.AddCustom(edgetpu::kCustomOp, edgetpu::RegisterCustomOp());
+        }
         tflite::InterpreterBuilder(*model_, resolver)(&interpreter_);
         if (!interpreter_) {
             LOG(ERROR) << "Failed to create interpreter!";
             return false;
         }
+        if (edgetpu_ctx_) {
+            interpreter_->SetExternalContext(kTfLiteEdgeTpuContext, edgetpu_ctx_.get());
+        }
+
         if (interpreter_->AllocateTensors() != kTfLiteOk) {
             LOG(ERROR) << "Failed to allocate tensors!";
             return false;
@@ -353,6 +394,7 @@ class ObjDetector {
         }
     }
 
+    std::shared_ptr<edgetpu::EdgeTpuContext> edgetpu_ctx_;
     std::unique_ptr<tflite::FlatBufferModel> model_;
     std::unique_ptr<tflite::Interpreter> interpreter_;
     std::vector<std::string> labels_;
@@ -406,4 +448,5 @@ int main(int argc, char** argv) {
 1. Intel(R) Core(TM) i3-8300 CPU @ 3.70GHz
 ssdlite_mobilenet_v2_coco10_lite/beach.mkv: 290 300x300 frames processed in 7859 ms(27 mspf).
 ssdlite_mobilenet_v2_mixed_lite/beach.mkv: 290 300x300 frames processed in 8135 ms(28 mspf).
+ssdlite_mobilenet_v2_mixed_edgetpu/beach.mkv: 290 300x300 frames processed in 2959 ms(10 mspf).
 */

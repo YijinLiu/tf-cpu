@@ -15,3 +15,4 @@ ssdlite_mobilenet_v2_coco10_lite/
 ssdlite_mobilenet_v2_mixed/
 ssdlite_mobilenet_v2_mixed_dldt/
 ssdlite_mobilenet_v2_mixed_lite/
+ssdlite_mobilenet_v2_mixed_edgetpu/

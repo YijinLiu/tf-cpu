@@ -324,34 +324,6 @@ install_tensorflow() {
         cd tensorflow
     fi
 
-    # Build tensorflow lite.
-    ./tensorflow/lite/tools/make/download_dependencies.sh &&
-    ./tensorflow/lite/tools/make/build_lib.sh
-    rc=$?
-    if [ $rc != 0 ]; then
-        echo -e "${RED}Failed to build Tensorflow lite!${NC}"
-        return 1
-    fi
-    sudo mkdir -p $prefix/lib &&
-    sudo install tensorflow/lite/tools/make/gen/linux_$(arch)/lib/libtensorflow-lite.a $prefix/lib &&
-    sudo mkdir -p $prefix/include &&
-    install_headers tensorflow/lite $prefix/include
-    rc=$?
-    if [ $rc != 0 ]; then
-        echo -e "${RED}Failed to install Tensorflow lite!${NC}"
-        return 1
-    fi
-    cd tensorflow/lite/tools/make/downloads/flatbuffers
-    mkdir -p build
-    cd build
-    cmake -DCMAKE_INSTALL_PREFIX=$prefix .. && $MAKE && sudo make install
-    rc=$?
-    if [ $rc != 0 ]; then
-        echo -e "${RED}Failed to install flatbuffers${NC}"
-        return 1
-    fi
-    cd ../../../../../../../
-
     # Build tensorflow core.
     echo "/usr/bin/python3
 /usr/lib/python3/dist-packages
@@ -409,6 +381,58 @@ n" | ./configure
         return 1
     fi
     cd ../../../../..
+}
+
+install_libedgetpu() {
+    if [ ! -d "libedgetpu" ]; then
+        git clone --depth=1 https://github.com/google-coral/libedgetpu
+    fi
+    cd libedgetpu
+    $MAKE &&
+    sudo cp tflite/public/*.h $prefix/include &&
+    sudo cp bazel-bin/tflite/public/libedgetpu_direct_all.so $prefix/lib/libedgetpu.so.1.0 &&
+    sudo ldconfig &&
+    sudo ln -sf libedgetpu.so.1 $prefix/lib/libedgetpu.so
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to install libedgetpu!${NC}"
+        return 1
+    fi
+
+    # Build tensorflow lite.
+    cd bazel-libedgetpu/external/org_tensorflow
+    sed "s/{{mopts}}/${mopts}/g" ${BASEDIR}/tflite.patch | patch -l -p1
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to patch tensorflow!${NC}"
+        return 1
+    fi
+    ./tensorflow/lite/tools/make/download_dependencies.sh &&
+    ./tensorflow/lite/tools/make/build_lib.sh
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to build Tensorflow lite!${NC}"
+        return 1
+    fi
+    sudo mkdir -p $prefix/lib &&
+    sudo cp tensorflow/lite/tools/make/gen/linux_$(arch)/lib/libtensorflow-lite.a $prefix/lib &&
+    sudo mkdir -p $prefix/include &&
+    install_headers tensorflow/lite $prefix/include
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to install Tensorflow lite!${NC}"
+        return 1
+    fi
+    cd tensorflow/lite/tools/make/downloads/flatbuffers
+    mkdir -p build
+    cd build
+    cmake -DCMAKE_INSTALL_PREFIX=$prefix .. && $MAKE && sudo make install
+    rc=$?
+    if [ $rc != 0 ]; then
+        echo -e "${RED}Failed to install flatbuffers${NC}"
+        return 1
+    fi
+    cd ../../../../../../../../../../..
 }
 
 install_x264() {
@@ -731,6 +755,7 @@ install_blas &&
 install_protobuf &&
 install_abseil_cpp &&
 install_tensorflow &&
+install_libedgetpu &&
 install_x264 &&
 install_ffmpeg &&
 install_gflags &&

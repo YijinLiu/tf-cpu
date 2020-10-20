@@ -7,7 +7,8 @@ BIN:=$(PROJECT_ROOT)/benchmark/bin
 TESTDATA:=$(PROJECT_ROOT)/benchmark/testdata
 VLOG_LEVEL?=-1
 
-all: run_classify_lite run_obj_detect_lite run_classify run_obj_detect run_obj_detect_dldt
+all: run_classify_lite run_obj_detect_lite run_classify run_obj_detect \
+     run_obj_detect_dldt run_obj_detect_edgetpu
 
 run_classify_lite: $(BIN)/classify_lite \
                    $(TESTDATA)/mobilenet_v1_1.0_224_quant.tflite \
@@ -73,9 +74,21 @@ run_classify: $(BIN)/classify \
               $(TESTDATA)/mobilenet_labels.txt
 	TF_CPP_MIN_VLOG_LEVEL=$(VLOG_LEVEL) $(BIN)/classify
 
+RUN_COUNT?=1
+
+run_obj_detect_edgetpu: run_obj_detect_edgetpu_model_ssdlite_mobilenet_v2_mixed
+
+run_obj_detect_edgetpu_model_%: $(TESTDATA)/%_edgetpu.tflite $(BIN)/obj_detect_edgetpu
+	@echo -e "\e[0;92mRunning $*_edgetpu ...\e[0m"
+	@mkdir -p $*_dldt
+	$(BIN)/obj_detect_edgetpu \
+	    --model $(TESTDATA)/$*_edgetpu.tflite \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
+	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_edgetpu --logtostderr \
+	    --run_count=$(RUN_COUNT) -v=$(VLOG_LEVEL)
+
 run_obj_detect_dldt: run_obj_detect_dldt_model_ssdlite_mobilenet_v2_mixed
 
-RUN_COUNT?=1
 DLDT_DEVICE?=CPU
 
 run_obj_detect_dldt_model_%: $(TESTDATA)/%_frozen.xml $(TESTDATA)/%_frozen.bin $(BIN)/obj_detect_dldt
@@ -95,6 +108,18 @@ run_obj_detect_lite_model_%: $(TESTDATA)/%.tflite $(BIN)/obj_detect_lite
 	@mkdir -p $*_lite
 	$(BIN)/obj_detect_lite \
 	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_lite --model_file=$< -v=$(VLOG_LEVEL) \
+	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
+		--run_count=$(RUN_COUNT)
+
+run_obj_detect_edgetpu: run_obj_detect_edgetpu_model_ssdlite_mobilenet_v2_mixed
+
+EDGETPU_PATH?=
+run_obj_detect_edgetpu_model_%: $(TESTDATA)/%_edgetpu.tflite $(BIN)/obj_detect_lite
+	@echo -e "\e[0;92mRunning $*_edgetpu ...\e[0m"
+	@mkdir -p $*_edgetpu
+	$(BIN)/obj_detect_lite \
+	    --use_edgetpu --edgetpu_path=$(EDGETPU_PATH) \
+	    --video_file=$(TESTDATA)/beach.mkv --output_dir=$*_edgetpu --model_file=$< -v=$(VLOG_LEVEL) \
 	    --labels_file=$(PROJECT_ROOT)/models/objdetect/$(OBJ_DETECT_LABELS_TXT/$*) \
 		--run_count=$(RUN_COUNT)
 
@@ -185,7 +210,7 @@ OPENCV_LDFLAGS=-lopencv_imgcodecs -lopencv_imgproc -lopencv_core -ljpeg
 
 $(BIN)/obj_detect_lite: $(BIN)/test_video.o $(BIN)/video_encoder.o $(BIN)/obj_detect_lite.o
 	mkdir -p $(BIN)
-	g++ -o $@ $^ -ltensorflow-lite $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
+	g++ -o $@ $^ -ltensorflow-lite -ledgetpu $(OPENCV_LDFLAGS) $(BLAS_LDFLAGS/$(BLAS)) $(LDFLAGS)
 
 $(BIN)/obj_detect.o: obj_detect.cc test_video.hpp video_encoder.hpp utils.hpp
 	mkdir -p $(BIN)
@@ -252,6 +277,9 @@ $(TESTDATA)/ssdlite_mobilenet_v2_mixed_frozen.xml: $(PROJECT_ROOT)/models/objdet
 	cp $< $@
 
 $(TESTDATA)/ssdlite_mobilenet_v2_mixed_frozen.bin: $(PROJECT_ROOT)/models/objdetect/mixed.bin
+	cp $< $@
+
+$(TESTDATA)/ssdlite_mobilenet_v2_mixed_edgetpu.tflite: $(PROJECT_ROOT)/models/objdetect/mixed_edgetpu.tflite
 	cp $< $@
 
 $(TESTDATA)/%_frozen.pb: $(PROJECT_ROOT)/models/objdetect/%.tar.gz

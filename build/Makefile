@@ -15,5 +15,5 @@ default:
 	             --build-arg BLAS=$(BLAS) --build-arg MOPTS="-march=native" .
 
 # To create a container:
-# docker run -it --device /dev/dri:/dev/dri -v /home/${USER}:/home/${USER} --user=${USER} \
-#     --workdir=/home/${USER} --name "tf-cpu-${USER}" ${USER}/tensorflow-mkl:2.2.1
+# docker run -it --privileged -v /dev/bus/usb:/dev/bus/usb -v /home/${USER}:/home/${USER} \
+#     --user=${USER} --workdir=/home/${USER} --name tf-cpu-${USER} ${USER}/tensorflow-mkl:2.2.1
